@@ -15,18 +15,19 @@ export const BLOCK_OPTIONS = [
   ['repeat', 'Ulangi'], ['if', 'Jika'], ['lever', 'Tarik Tuas'], ['wait', 'Tunggu'], ['call', 'Fungsi'],
 ];
 
+// Alat menggambar. `hot` = tombol pintas keyboard. `glyph` = penanda selain warna.
 const TOOLS = [
-  { key: '.', label: 'Lantai', color: '#6a6f74' },
-  { key: '#', label: 'Tembok', color: '#8a7240' },
-  { key: ' ', label: 'Lubang', color: '#05090a' },
-  { key: '~', label: 'Sungai', color: '#2d6cdf' },
-  { key: '^', label: 'Duri', color: '#c8ccd2' },
-  { key: 'S', label: 'Start', color: '#3c8dde' },
-  { key: 'E', label: 'Pintu', color: '#ffd84a' },
-  { key: 'M', label: 'Monster', color: '#9b6bc0' },
-  { key: 'lever', label: 'Tuas', color: '#d03a3a', grouped: true },
-  { key: 'bridge', label: 'Jembatan', color: '#8a5a2b', grouped: true },
-  { key: 'gate', label: 'Gerbang', color: '#9aa3ad', grouped: true },
+  { key: '.', label: 'Lantai', color: '#6a6f74', hot: '1' },
+  { key: '#', label: 'Tembok', color: '#8a7240', hot: '2', glyph: '▦' },
+  { key: ' ', label: 'Lubang', color: '#05090a', hot: '3' },
+  { key: '~', label: 'Sungai', color: '#2d6cdf', hot: '4', glyph: '≈' },
+  { key: '^', label: 'Duri', color: '#c8ccd2', hot: '5', glyph: '▲' },
+  { key: 'S', label: 'Start', color: '#3c8dde', hot: '6' },
+  { key: 'E', label: 'Pintu', color: '#ffd84a', hot: '7' },
+  { key: 'M', label: 'Monster', color: '#9b6bc0', hot: '8' },
+  { key: 'lever', label: 'Tuas', color: '#d03a3a', grouped: true, hot: '9' },
+  { key: 'bridge', label: 'Jembatan', color: '#8a5a2b', grouped: true, hot: '0' },
+  { key: 'gate', label: 'Gerbang', color: '#9aa3ad', grouped: true, hot: '-' },
 ];
 
 const GROUP_CH = { lever: '123', bridge: 'abc', gate: 'XYZ' };
@@ -36,15 +37,20 @@ const cellColor = (ch) => {
   if ('XYZ'.includes(ch)) return '#9aa3ad';
   return TOOLS.find((t) => t.key === ch)?.color || '#6a6f74';
 };
+const cellName = (ch) => {
+  if ('123'.includes(ch)) return `Tuas ${ch}`;
+  if ('abc'.includes(ch)) return `Jembatan ${'abc'.indexOf(ch) + 1}`;
+  if ('XYZ'.includes(ch)) return `Gerbang ${'XYZ'.indexOf(ch) + 1}`;
+  return TOOLS.find((t) => t.key === ch)?.label || 'Lantai';
+};
 const cellText = (ch, d) => {
   if (ch === 'S') return DIR_ARROW[d.startDir];
   if (ch === 'E') return '🚪';
   if (ch === 'M') return d.monsterKind === 'golem' ? '🗿' : '👹';
-  if (ch === '^') return '▲';
   if ('123'.includes(ch)) return 'T' + ch;
   if ('abc'.includes(ch)) return 'J' + ('abc'.indexOf(ch) + 1);
   if ('XYZ'.includes(ch)) return 'G' + ('XYZ'.indexOf(ch) + 1);
-  return '';
+  return TOOLS.find((t) => t.key === ch)?.glyph || '';
 };
 
 export function newDraft() {
@@ -140,16 +146,96 @@ export function decodeDraft(code) {
 }
 
 // ============================================================
+//  Analisis cepat: peringatan sebelum uji coba.
+//  Jangkauan dihitung optimistis: semua tuas dianggap ditarik (kalau blok Tarik
+//  Tuas tersedia) dan monster bisa dilewati (kalau blok Jika tersedia).
+// ============================================================
+export function analyze(d) {
+  const lv = draftToLevel(d);
+  const def = parseLevel(lv);
+  const allow = new Set(lv.blocks);
+  const warns = [];
+  const leverIds = new Set(def.levers.values());
+
+  if (def.monsters.length && !allow.has('if')) warns.push('Ada monster, tapi blok Jika tidak tersedia. Monster bangun/tidur acak, jadi pemain butuh sensor.');
+  if (def.monsters.length && !allow.has('wait')) warns.push('Ada monster, tapi blok Tunggu tidak tersedia.');
+  if (leverIds.size && !allow.has('lever')) warns.push('Ada tuas, tapi blok Tarik Tuas tidak tersedia.');
+  const linked = new Set();
+  def.cells.flat().forEach((c) => { if (c.kind === 'bridge' || c.kind === 'gate') linked.add(c.id); });
+  for (const id of linked) if (!leverIds.has(id)) warns.push(`Jembatan/Gerbang ${id} tidak punya Tuas ${id}.`);
+
+  const open = allow.has('lever') ? leverIds : new Set();
+  const cell = (x, z) => def.cells[z]?.[x];
+  const isMon = (x, z) => def.monsters.some((m) => m.x === x && m.z === z);
+  const stand = (x, z) => {
+    const c = cell(x, z);
+    if (!c) return false;
+    if (isMon(x, z) && !allow.has('if')) return false;
+    if (c.kind === 'floor') return true;
+    if (c.kind === 'bridge' || c.kind === 'gate') return open.has(c.id);
+    return false;
+  };
+  const blocksJump = (x, z) => {
+    const c = cell(x, z);
+    return !c || c.kind === 'wall' || (c.kind === 'gate' && !open.has(c.id)) || isMon(x, z);
+  };
+  const seen = new Set([`${def.start.x},${def.start.z}`]);
+  const queue = [def.start];
+  while (queue.length) {
+    const { x, z } = queue.shift();
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const next = [[x + dx, z + dz]];
+      if (allow.has('jump') && !blocksJump(x + dx, z + dz)) next.push([x + dx * 2, z + dz * 2]);
+      for (const [nx, nz] of next) {
+        const k = `${nx},${nz}`;
+        if (!seen.has(k) && stand(nx, nz)) { seen.add(k); queue.push({ x: nx, z: nz }); }
+      }
+    }
+  }
+  const reachable = seen.has(`${def.exit.x},${def.exit.z}`);
+  if (!reachable) warns.unshift('Pintu tidak bisa dicapai dari Start dengan blok yang tersedia.');
+  return { warns, reachable };
+}
+
+// ============================================================
 //  UI editor
-//  api: { preview(level, opts), save(draft), play(draft), share(draft), close(), toast(msg), sfx(kind) }
+//  api: { preview(level, opts), save(draft), play(draft), share(draft), close(draft), toast(msg), sfx(kind) }
+//
+//  Grid = satu kontrol fokus (roving tabindex): panah/D-pad memindah kursor,
+//  Enter/Spasi/A menggambar, Shift+panah menggambar sambil bergerak.
+//  Ctrl+Z / Ctrl+Y = urungkan / ulangi. Angka 1-9, 0, - = pilih alat.
 // ============================================================
 export function createEditor(root, api) {
   let d = null;
   let tool = '.';
   let groupId = 1;
   let painting = false;
+  let cursor = { x: 1, z: 1 };
+  let undo = [], redo = [];
 
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const $ = (id) => root.querySelector('#' + id);
+  const snapshot = () => JSON.stringify({ ...d, verified: undefined, best: undefined });
+
+  // ---------- riwayat ----------
+  function checkpoint() {
+    const s = snapshot();
+    if (undo[undo.length - 1] === s) return;
+    undo.push(s);
+    if (undo.length > 60) undo.shift();
+    redo = [];
+    renderHistory();
+  }
+  function restore(from, to) {
+    if (!from.length) return;
+    to.push(snapshot());
+    const s = JSON.parse(from.pop());
+    Object.assign(d, s, { verified: false, best: null });
+    api.sfx('click');
+    render();
+    changed({ resetCamera: true });
+    focusGrid();
+  }
 
   function changed({ resetCamera = false } = {}) {
     d.verified = false;
@@ -163,24 +249,25 @@ export function createEditor(root, api) {
     const row = d.map[z];
     d.map[z] = row.slice(0, x) + ch + row.slice(x + 1);
   }
-
   function toolChar() {
     const t = TOOLS.find((t) => t.key === tool);
     return t.grouped ? GROUP_CH[tool][groupId - 1] : tool;
   }
 
-  function paint(x, z) {
+  function paint(x, z, { quiet = false } = {}) {
     const cur = d.map[z][x];
     const ch = toolChar();
-    if (cur === 'S' && ch === 'S') { d.startDir = (d.startDir + 1) % 4; renderGrid(); syncDirSelect(); changed(); return; }
-    if (cur === ch) return;
-    if ((cur === 'S' || cur === 'E') && ch !== cur) {
-      if (!painting || painting === 'first') api.toast('Start dan Pintu tidak bisa ditimpa. Pindahkan dengan alat Start/Pintu.');
+    if (cur === 'S' && ch === 'S') {
+      d.startDir = (d.startDir + 1) % 4;
+      renderGrid(); syncFields(); changed();
       return;
     }
-    if (ch === 'S' || ch === 'E') {
-      d.map.forEach((row, zz) => { const xx = row.indexOf(ch); if (xx >= 0) setCell(xx, zz, '.'); });
+    if (cur === ch) return;
+    if ((cur === 'S' || cur === 'E') && ch !== cur) {
+      if (!quiet) api.toast('Start dan Pintu tidak bisa ditimpa. Pindahkan dengan alat Start/Pintu.');
+      return;
     }
+    if (ch === 'S' || ch === 'E') d.map.forEach((row, zz) => { const xx = row.indexOf(ch); if (xx >= 0) setCell(xx, zz, '.'); });
     setCell(x, z, ch);
     api.sfx('click');
     renderGrid();
@@ -189,77 +276,92 @@ export function createEditor(root, api) {
 
   function resize(dw, dd) {
     const W = d.map[0].length, D = d.map.length;
-    if (dw > 0 && W < MAX_W) d.map = d.map.map((r) => r + '.');
-    if (dw < 0 && W > MIN) {
-      if (d.map.some((r) => 'SE'.includes(r[W - 1]))) return api.toast('Kolom terakhir berisi Start/Pintu. Pindahkan dulu.');
-      d.map = d.map.map((r) => r.slice(0, -1));
+    if (dw < 0 && W > MIN && d.map.some((r) => 'SE'.includes(r[W - 1]))) return api.toast('Kolom terakhir berisi Start/Pintu. Pindahkan dulu.');
+    if (dd < 0 && D > MIN && /[SE]/.test(d.map[D - 1])) return api.toast('Baris terakhir berisi Start/Pintu. Pindahkan dulu.');
+    if ((dw > 0 && W >= MAX_W) || (dd > 0 && D >= MAX_D) || (dw < 0 && W <= MIN) || (dd < 0 && D <= MIN)) {
+      return api.toast(`Ukuran peta ${MIN}×${MIN} sampai ${MAX_W}×${MAX_D}.`);
     }
-    if (dd > 0 && D < MAX_D) d.map = [...d.map, '.'.repeat(W + 0)].map((r) => r.padEnd(d.map[0].length, '.'));
-    if (dd < 0 && D > MIN) {
-      if (/[SE]/.test(d.map[D - 1])) return api.toast('Baris terakhir berisi Start/Pintu. Pindahkan dulu.');
-      d.map = d.map.slice(0, -1);
-    }
+    checkpoint();
+    if (dw > 0) d.map = d.map.map((r) => r + '.');
+    if (dw < 0) d.map = d.map.map((r) => r.slice(0, -1));
+    if (dd > 0) d.map = [...d.map, '.'.repeat(W)];
+    if (dd < 0) d.map = d.map.slice(0, -1);
+    cursor.x = Math.min(cursor.x, d.map[0].length - 1);
+    cursor.z = Math.min(cursor.z, d.map.length - 1);
     renderSize();
     renderGrid();
     changed({ resetCamera: true });
+  }
+
+  function selectTool(key) {
+    tool = key;
+    renderTools();
+    const t = TOOLS.find((t) => t.key === key);
+    api.toast(`Alat: ${t.label}${t.grouped ? ' ' + groupId : ''}`);
   }
 
   // ---------- render ----------
   function render() {
     root.innerHTML = `
       <div class="ed-head">
-        <h2>Editor level</h2>
-        <span class="ed-status" id="edStatus"></span>
+        <h2>Editor Level</h2>
+        <div class="ed-history">
+          <button class="btn icon" id="edUndo" title="Urungkan (Ctrl+Z)" aria-label="Urungkan"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+          <button class="btn icon" id="edRedo" title="Ulangi (Ctrl+Y)" aria-label="Ulangi"><svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
+        </div>
       </div>
+      <div class="ed-status-box" id="edStatus" role="status" aria-live="polite"></div>
       <label class="ed-field"><span>Nama</span><input id="edName" maxlength="40"></label>
 
-      <div class="ed-label">Alat <span class="dim">· klik / seret di grid · klik Start lagi untuk memutar arah</span></div>
-      <div class="ed-tools" id="edTools"></div>
+      <div class="ed-label">Alat <span class="dim">· tombol angka untuk memilih cepat</span></div>
+      <div class="ed-tools" id="edTools" role="toolbar" aria-label="Alat menggambar"></div>
       <div class="ed-group" id="edGroup">
         <span>Nomor:</span>
-        ${[1, 2, 3].map((n) => `<button data-g="${n}">${n}</button>`).join('')}
+        ${[1, 2, 3].map((n) => `<button data-g="${n}" aria-label="Nomor ${n}">${n}</button>`).join('')}
         <span class="dim">Tuas N menggerakkan Jembatan N &amp; Gerbang N</span>
       </div>
 
       <div class="ed-size">
-        <span>Lebar</span><button data-r="w-">−</button><b id="edW"></b><button data-r="w+">+</button>
-        <span>Tinggi</span><button data-r="d-">−</button><b id="edD"></b><button data-r="d+">+</button>
+        <span>Lebar</span><button data-r="w-" aria-label="Kurangi lebar">−</button><b id="edW"></b><button data-r="w+" aria-label="Tambah lebar">+</button>
+        <span>Tinggi</span><button data-r="d-" aria-label="Kurangi tinggi">−</button><b id="edD"></b><button data-r="d+" aria-label="Tambah tinggi">+</button>
       </div>
-      <div class="ed-grid" id="edGrid"></div>
+      <div class="ed-grid" id="edGrid" role="grid" aria-label="Peta level" data-own-arrows></div>
+      <p class="ed-help">Klik/seret, atau <kbd>panah</kbd> + <kbd>Enter</kbd>. <kbd>Shift</kbd>+panah menggambar sambil bergerak. Klik Start lagi untuk memutar arah.</p>
 
-      <details class="ed-settings" open>
-        <summary>Pengaturan</summary>
+      <details class="ed-settings">
+        <summary>Pengaturan level</summary>
         <div class="ed-form">
           <label><span>Arah start</span><select id="edDir">${DIR_NAME.map((n, i) => `<option value="${i}">${n}</option>`).join('')}</select></label>
           <label><span>Tema</span><select id="edTheme">${LEVELS.map((l, i) => `<option value="${i}">${esc(l.name)}</option>`).join('')}</select></label>
           <label><span>Waktu (detik)</span><input id="edTime" type="number" min="30" max="600" step="10"></label>
           <label><span>Batas blok (0 = bebas)</span><input id="edLimit" type="number" min="0" max="99"></label>
           <label><span>Jenis monster</span><select id="edKind"><option value="monster">Monster</option><option value="golem">Golem</option></select></label>
-          <label><span>Bangun / tidur (giliran)</span><span class="ed-pair"><input id="edAwake" type="number" min="1" max="6"><input id="edSleep" type="number" min="1" max="6"></span></label>
+          <label><span>Bangun / tidur (giliran)</span><span class="ed-pair"><input id="edAwake" type="number" min="1" max="6" aria-label="Giliran bangun"><input id="edSleep" type="number" min="1" max="6" aria-label="Giliran tidur"></span></label>
         </div>
         <div class="ed-label">Blok yang tersedia</div>
         <div class="ed-blocks" id="edBlocks"></div>
       </details>
 
       <div class="ed-actions">
-        <button class="run small" id="edPlay">▶ Uji coba</button>
-        <button class="btn" id="edShare">Bagikan kode</button>
-        <button class="btn" id="edClose">Selesai</button>
+        <button class="run small" id="edPlay" title="Uji coba (Ctrl+Enter)">▶ Uji coba</button>
+        <button class="btn" id="edShare">Bagikan</button>
+        <button class="btn" id="edClose" title="Simpan & tutup (Esc)">Selesai</button>
       </div>`;
 
-    const $ = (id) => root.querySelector('#' + id);
     $('edName').value = d.name;
+    $('edName').addEventListener('focus', checkpoint);
     $('edName').addEventListener('input', () => { d.name = $('edName').value; api.save(d); });
     $('edName').addEventListener('change', () => changed());
 
-    const tools = $('edTools');
     for (const t of TOOLS) {
       const b = document.createElement('button');
       b.className = 'ed-tool';
       b.dataset.k = t.key;
-      b.innerHTML = `<i style="background:${t.color}"></i>${t.label}`;
+      b.setAttribute('aria-pressed', 'false');
+      b.title = `${t.label} (tombol ${t.hot})`;
+      b.innerHTML = `<i style="background:${t.color}">${t.glyph || ''}</i><span>${t.label}</span><kbd>${t.hot}</kbd>`;
       b.onclick = () => { tool = t.key; renderTools(); };
-      tools.appendChild(b);
+      $('edTools').appendChild(b);
     }
     $('edGroup').querySelectorAll('button').forEach((b) => { b.onclick = () => { groupId = +b.dataset.g; renderTools(); }; });
     root.querySelectorAll('[data-r]').forEach((b) => {
@@ -269,97 +371,171 @@ export function createEditor(root, api) {
       };
     });
 
-    $('edDir').value = d.startDir;
-    $('edDir').onchange = () => { d.startDir = +$('edDir').value; renderGrid(); changed(); };
-    $('edTheme').value = d.theme;
-    $('edTheme').onchange = () => { d.theme = +$('edTheme').value; changed(); };
-    $('edTime').value = d.time;
-    $('edTime').onchange = () => { d.time = clampInt($('edTime').value, 30, 600, 180); $('edTime').value = d.time; changed(); };
-    $('edLimit').value = d.limit;
-    $('edLimit').onchange = () => { d.limit = clampInt($('edLimit').value, 0, 99, 0); $('edLimit').value = d.limit; changed(); };
-    $('edKind').value = d.monsterKind;
-    $('edKind').onchange = () => { d.monsterKind = $('edKind').value; renderGrid(); changed(); };
-    $('edAwake').value = d.cycle.awake;
-    $('edSleep').value = d.cycle.sleep;
+    const field = (id, apply) => {
+      $(id).addEventListener('focus', checkpoint);
+      $(id).addEventListener('change', () => { apply(); renderGrid(); changed(); });
+    };
+    field('edDir', () => { d.startDir = +$('edDir').value; });
+    field('edTheme', () => { d.theme = +$('edTheme').value; });
+    field('edTime', () => { d.time = clampInt($('edTime').value, 30, 600, 180); $('edTime').value = d.time; });
+    field('edLimit', () => { d.limit = clampInt($('edLimit').value, 0, 99, 0); $('edLimit').value = d.limit; });
+    field('edKind', () => { d.monsterKind = $('edKind').value; });
     const cyc = () => {
       d.cycle = { awake: clampInt($('edAwake').value, 1, 6, 2), sleep: clampInt($('edSleep').value, 1, 6, 2) };
       $('edAwake').value = d.cycle.awake; $('edSleep').value = d.cycle.sleep;
-      changed();
     };
-    $('edAwake').onchange = cyc;
-    $('edSleep').onchange = cyc;
+    field('edAwake', cyc);
+    field('edSleep', cyc);
 
-    const blocks = $('edBlocks');
     for (const [k, label] of BLOCK_OPTIONS) {
       const l = document.createElement('label');
       const fixed = k === 'move';
       l.innerHTML = `<input type="checkbox" ${fixed || d.blocks.includes(k) ? 'checked' : ''} ${fixed ? 'disabled' : ''}> ${label}`;
       l.querySelector('input').onchange = (e) => {
+        checkpoint();
         d.blocks = e.target.checked ? [...new Set([...d.blocks, k])] : d.blocks.filter((b) => b !== k);
         changed();
       };
-      blocks.appendChild(l);
+      $('edBlocks').appendChild(l);
     }
 
+    $('edUndo').onclick = () => restore(undo, redo);
+    $('edRedo').onclick = () => restore(redo, undo);
     $('edPlay').onclick = () => api.play(d);
     $('edShare').onclick = () => api.share(d);
     $('edClose').onclick = () => api.close(d);
 
+    // ---------- grid: mouse/sentuh ----------
     const grid = $('edGrid');
     grid.addEventListener('pointerdown', (e) => {
       const c = e.target.closest('.ecell');
       if (!c) return;
       e.preventDefault();
-      painting = 'first';
-      paint(+c.dataset.x, +c.dataset.z);
+      checkpoint();
+      cursor = { x: +c.dataset.x, z: +c.dataset.z };
+      paint(cursor.x, cursor.z);
       painting = true;
+      focusGrid();
     });
     grid.addEventListener('pointermove', (e) => {
       if (!painting) return;
       const c = document.elementFromPoint(e.clientX, e.clientY)?.closest('.ecell');
-      if (c) paint(+c.dataset.x, +c.dataset.z);
+      if (c && grid.contains(c)) { cursor = { x: +c.dataset.x, z: +c.dataset.z }; paint(cursor.x, cursor.z, { quiet: true }); }
+    });
+
+    // ---------- grid: keyboard / gamepad ----------
+    grid.addEventListener('keydown', (e) => {
+      const dirs = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+      if (dirs[e.key] && !e.altKey && !e.ctrlKey) {
+        const [dx, dz] = dirs[e.key];
+        const nx = cursor.x + dx, nz = cursor.z + dz;
+        if (nx < 0 || nz < 0 || nx >= d.map[0].length || nz >= d.map.length) return; // tepi: biarkan fokus keluar grid
+        e.preventDefault();
+        e.stopPropagation();
+        cursor = { x: nx, z: nz };
+        if (e.shiftKey) { if (!e.repeat) checkpoint(); paint(nx, nz, { quiet: true }); }
+        else renderGrid();
+        focusGrid();
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        checkpoint();
+        paint(cursor.x, cursor.z);
+        focusGrid();
+      }
     });
 
     renderTools();
     renderSize();
     renderGrid();
+    syncFields();
     renderStatus();
+    renderHistory();
   }
 
   function renderTools() {
-    root.querySelectorAll('.ed-tool').forEach((b) => b.classList.toggle('on', b.dataset.k === tool));
+    root.querySelectorAll('.ed-tool').forEach((b) => {
+      const on = b.dataset.k === tool;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
     const grouped = TOOLS.find((t) => t.key === tool)?.grouped;
-    const g = root.querySelector('#edGroup');
+    const g = $('edGroup');
     g.classList.toggle('off', !grouped);
-    g.querySelectorAll('button').forEach((b) => b.classList.toggle('on', +b.dataset.g === groupId));
+    g.querySelectorAll('button').forEach((b) => {
+      b.classList.toggle('on', +b.dataset.g === groupId);
+      b.disabled = !grouped;
+    });
   }
   function renderSize() {
-    root.querySelector('#edW').textContent = d.map[0].length;
-    root.querySelector('#edD').textContent = d.map.length;
+    $('edW').textContent = d.map[0].length;
+    $('edD').textContent = d.map.length;
   }
   function renderGrid() {
-    const grid = root.querySelector('#edGrid');
+    const grid = $('edGrid');
     const W = d.map[0].length;
+    const hadFocus = grid.contains(document.activeElement);
     grid.style.gridTemplateColumns = `repeat(${W}, 1fr)`;
-    grid.style.maxWidth = `${W * 34}px`;
-    grid.innerHTML = d.map.map((row, z) => [...row].map((ch, x) =>
-      `<div class="ecell${ch === ' ' ? ' hole' : ''}" data-x="${x}" data-z="${z}" style="background:${cellColor(ch)}">${cellText(ch, d)}</div>`).join('')).join('');
+    grid.style.maxWidth = `${W * 2.2}rem`;
+    grid.innerHTML = d.map.map((row, z) => `<div role="row" class="erow">${[...row].map((ch, x) => {
+      const cur = x === cursor.x && z === cursor.z;
+      const extra = ch === 'S' ? `, menghadap ${DIR_NAME[d.startDir]}` : '';
+      return `<div role="gridcell" class="ecell${ch === ' ' ? ' hole' : ''}${cur ? ' cursor' : ''}" data-x="${x}" data-z="${z}"
+        tabindex="${cur ? 0 : -1}" aria-label="${cellName(ch)}${extra}, kolom ${x + 1} baris ${z + 1}"
+        style="background:${cellColor(ch)}">${cellText(ch, d)}</div>`;
+    }).join('')}</div>`).join('');
+    if (hadFocus) focusGrid();
   }
-  function syncDirSelect() { const s = root.querySelector('#edDir'); if (s) s.value = d.startDir; }
+  function focusGrid() {
+    root.querySelector('.ecell.cursor')?.focus({ preventScroll: true });
+  }
+  function syncFields() {
+    $('edDir').value = d.startDir;
+    $('edTheme').value = d.theme;
+    $('edTime').value = d.time;
+    $('edLimit').value = d.limit;
+    $('edKind').value = d.monsterKind;
+    $('edAwake').value = d.cycle.awake;
+    $('edSleep').value = d.cycle.sleep;
+  }
+  function renderHistory() {
+    if (!$('edUndo')) return;
+    $('edUndo').disabled = !undo.length;
+    $('edRedo').disabled = !redo.length;
+  }
   function renderStatus() {
-    const s = root.querySelector('#edStatus');
-    if (!s) return;
-    s.textContent = d.verified ? '✓ Sudah diuji' : 'Belum diuji';
-    s.className = 'ed-status' + (d.verified ? ' ok' : '');
+    const box = $('edStatus');
+    if (!box) return;
+    const { warns } = analyze(d);
+    const badge = d.verified
+      ? '<span class="ed-badge ok">✓ Sudah diuji: level ini terbukti bisa diselesaikan</span>'
+      : warns.length
+        ? `<span class="ed-badge warn">⚠ ${warns.length} masalah ditemukan</span>`
+        : '<span class="ed-badge">Belum diuji: tekan Uji coba untuk membuktikan bisa diselesaikan</span>';
+    box.innerHTML = badge + (warns.length ? `<ul>${warns.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : '');
   }
 
+  // Pintasan yang berlaku di seluruh editor (kecuali saat mengetik di kolom isian).
+  root.addEventListener('keydown', (e) => {
+    const typing = ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) && e.target.type !== 'checkbox';
+    const k = e.key.toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && k === 'z' && !e.shiftKey) { if (!typing) { e.preventDefault(); restore(undo, redo); } return; }
+    if ((e.ctrlKey || e.metaKey) && (k === 'y' || (k === 'z' && e.shiftKey))) { if (!typing) { e.preventDefault(); restore(redo, undo); } return; }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); api.play(d); return; }
+    if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = TOOLS.find((t) => t.hot === e.key);
+    if (t) { e.preventDefault(); selectTool(t.key); }
+  });
   window.addEventListener('pointerup', () => { painting = false; });
 
   return {
     open(draft) {
       d = structuredClone(draft);
+      undo = []; redo = [];
+      const s = d.map.findIndex((r) => r.includes('S'));
+      cursor = { x: Math.max(0, d.map[s].indexOf('S')), z: Math.max(0, s) };
       render();
       api.preview(draftToLevel(d), { resetCamera: true });
+      setTimeout(focusGrid, 0);
     },
     get draft() { return d; },
   };

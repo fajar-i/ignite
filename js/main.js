@@ -1239,7 +1239,7 @@ setInterval(() => {
   const now = performance.now();
   const dt = (now - lastTick) / 1000;
   lastTick = now;
-  const menuOpen = !document.getElementById('profileOverlay').hidden || !document.getElementById('settingsOverlay').hidden || !document.getElementById('stageOverlay').hidden;
+  const menuOpen = !document.getElementById('askOverlay').hidden || !document.getElementById('profileOverlay').hidden || !document.getElementById('settingsOverlay').hidden || !document.getElementById('stageOverlay').hidden;
   const active = !running && !editing && !stageDone && !menuOpen && blockingUI === 0 && document.getElementById('titleOverlay').hidden && document.visibilityState === 'visible';
   if (!active) return;
   elapsed += dt;
@@ -1467,6 +1467,7 @@ async function startLevel(lv, { intro = true } = {}) {
   world = new World(stage);
   if (!lv.custom) store('last', LEVELS.indexOf(lv));
   document.getElementById('stageTitle').textContent = lv.custom ? 'LEVEL CUSTOM' : chapterOf(stage);
+  document.getElementById('btnEditLevel').hidden = !lv.custom;
   document.getElementById('stageSub').textContent = stage.name;
   document.getElementById('concept').innerHTML =
     `Konsep: <b>${esc(stage.concept)}</b><br>Engineering: <b>${esc(stage.engineering)}</b>`;
@@ -1532,6 +1533,7 @@ function enterEditor(draft) {
   closeDialog();
   editing = true;
   document.body.classList.add('editing');
+  document.getElementById('btnEditLevel').hidden = true;
   titleEl.hidden = true;
   stageOverlay.hidden = true;
   winOverlay.hidden = true;
@@ -1545,26 +1547,80 @@ function exitEditor() {
   document.body.classList.remove('editing');
 }
 
+// ------------------------------------------------------------
+//  Modal in-game (pengganti confirm/prompt bawaan browser): ikut screen stack,
+//  fokus terkunci, bisa dipakai keyboard & gamepad.
+//  ask({ title, text, input: 'line' | 'area' | null, value, readonly, ok, cancel, danger })
+//  -> Promise: string (input), true (konfirmasi), atau null (batal).
+// ------------------------------------------------------------
+const askEl = document.getElementById('askOverlay');
+let askResolve = null;
+function ask({ title, text = '', input = null, value = '', readonly = false, ok = 'OK', cancel = 'Batal', danger = false, placeholder = '' }) {
+  askResolve?.(null);
+  const line = document.getElementById('askLine');
+  const area = document.getElementById('askArea');
+  const okBtn = document.getElementById('askOk');
+  const cancelBtn = document.getElementById('askCancel');
+  document.getElementById('askTitle').textContent = title;
+  document.getElementById('askText').textContent = text;
+  document.getElementById('askError').textContent = '';
+  line.hidden = input !== 'line';
+  area.hidden = input !== 'area';
+  const field = input === 'line' ? line : input === 'area' ? area : null;
+  if (field) { field.value = value; field.readOnly = readonly; field.placeholder = placeholder; }
+  okBtn.textContent = ok;
+  okBtn.classList.toggle('danger-run', danger);
+  cancelBtn.textContent = cancel;
+  cancelBtn.hidden = cancel == null;
+  // fokus awal: kolom isian; untuk aksi berbahaya, tombol Batal (lebih aman)
+  for (const el of [line, area, okBtn, cancelBtn]) el.removeAttribute('data-autofocus');
+  (field && !readonly ? field : danger ? cancelBtn : okBtn).setAttribute('data-autofocus', '');
+  askEl.hidden = false;
+  if (field && readonly) setTimeout(() => field.select(), 0);
+  return new Promise((resolve) => {
+    askResolve = (v) => { askResolve = null; askEl.hidden = true; resolve(v); };
+  });
+}
+// validasi opsional sebelum menutup: kembalikan pesan error untuk menahan modal tetap terbuka
+let askValidate = null;
+document.getElementById('askOk').onclick = () => {
+  const line = document.getElementById('askLine'), area = document.getElementById('askArea');
+  const v = !line.hidden ? line.value : !area.hidden ? area.value : true;
+  const err = askValidate?.(v);
+  if (err) { document.getElementById('askError').textContent = err; return; }
+  askResolve?.(v);
+};
+document.getElementById('askCancel').onclick = () => askResolve?.(null);
+document.getElementById('askLine').addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('askOk').click(); });
+askEl.onclick = (e) => { if (e.target === askEl) askResolve?.(null); };
+
 async function shareCode(code) {
+  const r = await ask({
+    title: 'Bagikan level',
+    text: 'Kirim kode ini ke temanmu. Mereka cukup menempelkannya lewat "Impor kode".',
+    input: 'area', value: code, readonly: true, ok: 'Salin kode', cancel: 'Tutup',
+  });
+  if (r == null) return;
   try {
     await navigator.clipboard.writeText(code);
-    showToast('Kode level disalin. Tempel ke teman untuk dibagikan!');
+    showToast('Kode level disalin!');
   } catch {
-    window.prompt('Salin kode level ini:', code);
+    showToast('Tidak bisa menyalin otomatis. Pilih teksnya lalu tekan Ctrl+C.');
   }
 }
-function importCode() {
-  const code = window.prompt('Tempel kode level (diawali MSK1:)');
-  if (!code) return;
-  try {
-    const d = decodeDraft(code);
-    d.id = 'c' + Date.now().toString(36);
-    saveCustom(d);
-    showToast(`Level "${d.name}" berhasil diimpor`);
-    openStages();
-  } catch (e) {
-    showToast(e.message);
-  }
+async function importCode() {
+  askValidate = (v) => { try { decodeDraft(v); return null; } catch (e) { return e.message; } };
+  const code = await ask({
+    title: 'Impor level', text: 'Tempel kode level dari temanmu.', input: 'area',
+    placeholder: 'MSK1:…', ok: 'Impor',
+  });
+  askValidate = null;
+  if (code == null) return;
+  const d = decodeDraft(code);
+  d.id = 'c' + Date.now().toString(36);
+  saveCustom(d);
+  showToast(`Level "${d.name}" berhasil diimpor`);
+  openStages();
 }
 
 function openStages() {
@@ -1604,9 +1660,15 @@ function openStages() {
     card.querySelector('[data-a=play]').onclick = () => { stageOverlay.hidden = true; titleEl.hidden = true; audio(); startLevel(draftToLevel(d)); };
     card.querySelector('[data-a=edit]').onclick = () => { audio(); enterEditor(d); };
     card.querySelector('[data-a=share]').onclick = () => shareCode(encodeDraft(d));
-    card.querySelector('[data-a=del]').onclick = () => {
-      if (!window.confirm(`Hapus level "${d.name}"? Tindakan ini tidak bisa dibatalkan.`)) return;
+    card.querySelector('[data-a=del]').setAttribute('aria-label', `Hapus level ${d.name}`);
+    card.querySelector('[data-a=del]').onclick = async () => {
+      const yes = await ask({
+        title: 'Hapus level?', danger: true, ok: 'Hapus permanen',
+        text: `Level "${d.name}" akan dihapus dari perangkat ini dan tidak bisa dikembalikan. Bagikan kodenya dulu kalau ingin menyimpan salinan.`,
+      });
+      if (!yes) return;
       deleteCustom(d.id);
+      showToast(`Level "${d.name}" dihapus`);
       openStages();
     };
     cg.appendChild(card);
@@ -1619,6 +1681,10 @@ document.getElementById('btnTitleStages').onclick = openStages;
 document.getElementById('btnCloseStages').onclick = () => { stageOverlay.hidden = true; };
 stageOverlay.onclick = (e) => { if (e.target === stageOverlay) stageOverlay.hidden = true; };
 document.getElementById('btnNewLevel').onclick = newLevel;
+document.getElementById('btnEditLevel').onclick = () => {
+  const d = customs().find((c) => c.id === stage.id);
+  if (d) enterEditor(d);
+};
 document.getElementById('btnImport').onclick = importCode;
 document.getElementById('btnTitleEditor').onclick = newLevel;
 
@@ -1720,9 +1786,11 @@ document.getElementById('btnProfile').onclick = openProfile;
 document.getElementById('btnTitleProfile').onclick = openProfile;
 document.getElementById('btnCloseProfile').onclick = () => { profileOverlay.hidden = true; };
 profileOverlay.onclick = (e) => { if (e.target === profileOverlay) profileOverlay.hidden = true; };
-document.getElementById('btnRename').onclick = () => {
-  const n = window.prompt('Nama baru:', player.name);
-  if (n && n.trim()) { setName(n); renderTitle(); openProfile(); }
+document.getElementById('btnRename').onclick = async () => {
+  askValidate = (v) => (v.trim() ? null : 'Nama tidak boleh kosong');
+  const n = await ask({ title: 'Ganti nama', text: 'Nama ini dipakai narator dan putri untuk menyapamu.', input: 'line', value: player.name, ok: 'Simpan' });
+  askValidate = null;
+  if (n) { setName(n); renderTitle(); openProfile(); }
 };
 
 // ---------- pengaturan ----------
@@ -1752,6 +1820,7 @@ settingsOverlay.onclick = (e) => { if (e.target === settingsOverlay) settingsOve
 // ---------- shell UI: screen stack, fokus, keyboard & gamepad ----------
 // "Kembali" (Esc / tombol B): tutup layar teratas, lalu dialog, lalu keluar dari wadah blok.
 function goBack() {
+  if (!askEl.hidden) { askResolve?.(null); return; }
   if (!settingsOverlay.hidden) { settingsOverlay.hidden = true; return; }
   if (!profileOverlay.hidden) { profileOverlay.hidden = true; return; }
   if (!stageOverlay.hidden) { stageOverlay.hidden = true; return; }
@@ -1759,7 +1828,13 @@ function goBack() {
   if (!storyEl.hidden) { document.getElementById('storySkip').click(); return; }
   if (!titleEl.hidden) return;
   if (dialogState) { document.getElementById('dlgNext').click(); return; }
-  if (editing) return;
+  if (editing) {
+    // jangan tutup editor saat Esc dipakai untuk keluar dari kolom isian
+    const a = document.activeElement;
+    if (a && ['INPUT', 'SELECT', 'TEXTAREA'].includes(a.tagName)) { a.blur(); document.querySelector('#editorView .ecell.cursor')?.focus(); return; }
+    document.querySelector('#editorView #edClose')?.click();
+    return;
+  }
   if (activeList !== 'main') {
     const owner = ownerOf(activeList);
     activeList = 'main';

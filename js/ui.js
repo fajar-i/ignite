@@ -8,6 +8,7 @@
 //  - Panah keyboard / D-pad / stik kiri memindah fokus secara spasial.
 //  - Gamepad (layout standar): A = pilih, B = kembali, Y = jalankan, X = petunjuk,
 //    LB/RB = geser blok terpilih naik/turun, Start = pengaturan.
+//    Di grid editor: D-pad gerak kursor, tahan RT sambil D-pad = menggambar.
 // ============================================================
 
 const FOCUSABLE = [
@@ -15,7 +16,13 @@ const FOCUSABLE = [
   'select:not([disabled])', 'textarea:not([disabled])', '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
-const isShown = (el) => !!(el && el.getClientRects().length) && getComputedStyle(el).visibility !== 'hidden';
+// checkVisibility() juga menolak isi <details> yang tertutup (content-visibility: hidden),
+// yang tetap punya kotak layout tetapi tidak bisa difokus.
+const isShown = (el) => {
+  if (!el || !el.getClientRects().length) return false;
+  if (el.checkVisibility) return el.checkVisibility({ visibilityProperty: true });
+  return getComputedStyle(el).visibility !== 'hidden';
+};
 
 export function initUI({ app, overlays, actions }) {
   const stack = []; // [{ el, returnTo }]
@@ -83,7 +90,7 @@ export function initUI({ app, overlays, actions }) {
     if (!cur || cur === document.body || !scope.contains(cur)) return focusFirst(scope);
     const r = cur.getBoundingClientRect();
     const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-    let best = null, bestScore = Infinity;
+    const ranked = [];
     for (const el of items) {
       if (el === cur || el.contains(cur)) continue; // lewati diri sendiri & induknya
       const b = el.getBoundingClientRect();
@@ -91,10 +98,14 @@ export function initUI({ app, overlays, actions }) {
       const along = dir === 'right' ? dx : dir === 'left' ? -dx : dir === 'down' ? dy : -dy;
       const across = dir === 'left' || dir === 'right' ? Math.abs(dy) : Math.abs(dx);
       if (along <= 2) continue;
-      const score = along + across * 2.2;
-      if (score < bestScore) { bestScore = score; best = el; }
+      ranked.push([along + across * 2.2, el]);
     }
-    if (best) focusEl(best);
+    ranked.sort((a, b) => a[0] - b[0]);
+    // ambil kandidat terdekat yang benar-benar menerima fokus
+    for (const [, el] of ranked) {
+      focusEl(el);
+      if (document.activeElement === el) return;
+    }
   }
 
   const isTextLike = (el) => el && (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT'
@@ -157,6 +168,12 @@ export function initUI({ app, overlays, actions }) {
       const a = document.activeElement;
       if (a?.tagName === 'INPUT' && (a.type === 'range' || a.type === 'number') && (dir === 'left' || dir === 'right')) {
         stepValue(a, dir === 'right' ? 1 : -1);
+      } else if (a?.closest?.('[data-own-arrows]')) {
+        // kontrol komposit (mis. grid editor) mengurus panahnya sendiri; di tepi, fokus keluar
+        const key = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' }[dir];
+        const ev = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, shiftKey: !!b[7] });
+        a.dispatchEvent(ev);
+        if (!ev.defaultPrevented) move(dir);
       } else move(dir);
       lastMove = now;
     }
