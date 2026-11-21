@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "game-ui-ux": {
+      "source": "gamedev-skills/awesome-gamedev-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/disciplines/game-ui-ux/SKILL.md",
+      "computedHash": "ad4bbc423416f08e9b10ea9f627ee0154a508d64f9a11722f3445c4260b46034"
+    }
+  }
+}

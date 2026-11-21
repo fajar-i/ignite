@@ -2,10 +2,10 @@
 <html lang="id">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Mata Sang Kesatria</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
   <script type="importmap">
     {
@@ -17,61 +17,70 @@
   </script>
 </head>
 <body>
+  <!-- Dunia 3D: penuh layar -->
+  <div class="viewport" id="viewport"></div>
+
   <div class="app">
-    <!-- KIRI: dunia game -->
-    <section class="game-panel">
-      <header class="game-head">
-        <div class="title-wrap">
-          <h1 id="stageTitle">STAGE 1</h1>
-          <div class="stage-sub" id="stageSub"></div>
-        </div>
-        <div class="head-actions">
-          <button class="btn" id="btnStages" title="Pilih stage">
-            <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            <span>Pilih stage</span>
-          </button>
-          <button class="btn icon" id="btnMute" title="Suara">
-            <svg viewBox="0 0 24 24" id="muteIcon"></svg>
-          </button>
-        </div>
-      </header>
+    <!-- Bar atas melayang -->
+    <header class="topbar">
+      <div class="banner">
+        <div class="chapter" id="stageTitle">BAB I</div>
+        <div class="stage-sub" id="stageSub"></div>
+      </div>
       <div class="hud">
         <div class="chip" id="timer" title="Waktu menyusun (berhenti saat program berjalan)"></div>
         <div class="chip" id="starGoal"></div>
         <div class="chip" id="blockCount"></div>
       </div>
-      <div class="viewport" id="viewport">
-        <div class="concept" id="concept"></div>
-        <button class="hint-btn" id="btnHint" title="Minta petunjuk">👸 Petunjuk</button>
-        <div class="toast" id="toast"></div>
-        <div class="dialog" id="dialog" hidden>
-          <div class="portrait" id="dlgIcon"></div>
-          <div class="dlg-body">
-            <div class="dlg-name" id="dlgName"></div>
-            <div class="dlg-text" id="dlgText"></div>
-          </div>
-          <button class="dlg-next" id="dlgNext">Lanjut ›</button>
-        </div>
+      <div class="top-actions">
+        <button class="icon-btn" id="btnStages" title="Daftar bab">
+          <svg viewBox="0 0 24 24"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2.5Z"/><path d="M8 7h7M8 11h5"/></svg>
+        </button>
+        <button class="icon-btn" id="btnProfile" title="Profil">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+        </button>
+        <button class="icon-btn" id="btnSettings" title="Pengaturan">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+        </button>
+        <button class="icon-btn" id="btnMute" title="Suara">
+          <svg viewBox="0 0 24 24" id="muteIcon"></svg>
+        </button>
       </div>
-    </section>
+    </header>
 
-    <!-- KANAN: blok programming -->
-    <aside class="code-panel">
+    <div class="concept" id="concept"></div>
+    <button class="hint-btn" id="btnHint" title="Minta petunjuk">
+      <span class="seal-mini">👸</span> Petunjuk
+    </button>
+    <div class="toast" id="toast" role="status"></div>
+
+    <div class="dialog" id="dialog" hidden>
+      <div class="portrait" id="dlgIcon"></div>
+      <div class="dlg-body">
+        <div class="dlg-name" id="dlgName"></div>
+        <div class="dlg-text" id="dlgText"></div>
+      </div>
+      <button class="dlg-next" id="dlgNext">Lanjut ›</button>
+    </div>
+
+    <!-- Panel buku perintah -->
+    <aside class="code-panel paper">
+      <div class="editor" id="editorView"></div>
       <div class="section">
-        <h2>Blok</h2>
-        <p class="sub">Klik untuk menambah · Seret untuk mengatur</p>
+        <h2 class="panel-title">Kitab Perintah</h2>
+        <p class="sub">Klik untuk menambah · seret untuk mengatur</p>
         <div class="palette" id="palette"></div>
       </div>
 
       <div class="section grow">
         <div class="prog-head">
-          <h2>Program</h2>
+          <h2 class="panel-title">Program</h2>
           <button class="link-btn" id="btnClear">
             <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
             <span id="clearLabel">Hapus semua</span>
           </button>
         </div>
-        <div class="program" id="program"></div>
+        <div class="program" id="program" role="list" aria-label="Program"></div>
       </div>
 
       <div class="run-bar">
@@ -83,60 +92,125 @@
           <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
         </button>
         <label class="speed">
-          <span>Kecepatan:</span>
+          <span>Kecepatan</span>
           <input type="range" id="speed" min="1" max="5" value="2" />
         </label>
       </div>
     </aside>
   </div>
 
-  <!-- Layar judul -->
+  <!-- Sampul buku (layar judul) -->
   <div class="overlay title-screen" id="titleOverlay">
-    <div class="title-card">
-      <div class="title-icon">🛡️👸</div>
+    <div class="title-card paper">
+      <div class="ornament" aria-hidden="true">✦ ✦ ✦</div>
       <h1 id="gameTitle"></h1>
-      <p class="tagline">Jadilah mata bagi sang kesatria. Susun perintah, keluarlah dari kastil.</p>
+      <div class="rule"><span>✦</span></div>
+      <p class="tagline">Jadilah mata bagi sang kesatria.<br>Susun perintah, keluarlah dari kastil.</p>
+      <label class="name-field" id="nameField">
+        <span>Siapa namamu, pembaca?</span>
+        <input id="nameInput" maxlength="20" placeholder="Tulis namamu di sini" autocomplete="off" data-autofocus>
+      </label>
+      <p class="welcome" id="welcomeText" hidden></p>
       <div class="title-actions">
-        <button class="run" id="btnPlay">MULAI</button>
-        <button class="btn" id="btnTitleStages">Pilih stage</button>
-        <button class="btn" id="btnProlog">Prolog</button>
+        <button class="run" id="btnPlay" data-autofocus>BUKA BUKU</button>
+        <div class="title-row">
+          <button class="btn" id="btnTitleStages">Daftar bab</button>
+          <button class="btn" id="btnTitleEditor">Buat level</button>
+        </div>
+        <div class="title-row">
+          <button class="btn" id="btnProlog">Prolog</button>
+          <button class="btn" id="btnTitleProfile">Profil</button>
+          <button class="btn" id="btnTitleSettings">Pengaturan</button>
+        </div>
       </div>
       <p class="credit">Game edukasi STEM · Engineering</p>
     </div>
   </div>
 
-  <!-- Cutscene -->
+  <!-- Cutscene: halaman buku -->
   <div class="overlay story" id="storyOverlay" hidden>
-    <div class="story-card">
+    <div class="story-card paper">
       <div class="story-label" id="storyLabel"></div>
       <p class="story-text" id="storyText"></p>
       <div class="story-actions">
         <button class="link-btn" id="storySkip">Lewati</button>
         <span class="story-dots" id="storyDots"></span>
-        <button class="run small" id="storyNext">Lanjut ›</button>
+        <button class="run small" id="storyNext" data-autofocus>Lanjut ›</button>
       </div>
     </div>
   </div>
 
-  <!-- Pilih stage -->
-  <div class="overlay" id="stageOverlay" hidden>
-    <div class="modal wide">
-      <h2>Pilih stage</h2>
+  <!-- Daftar bab -->
+  <div class="overlay" id="stageOverlay" role="dialog" aria-modal="true" aria-label="Daftar bab" hidden>
+    <div class="modal wide paper">
+      <h2>Daftar Bab</h2>
       <div class="stage-grid" id="stageGrid"></div>
+      <div class="custom-head">
+        <h3>Level Custom</h3>
+        <div class="custom-actions">
+          <button class="run small" id="btnNewLevel">+ Buat level</button>
+          <button class="btn" id="btnImport">Impor kode</button>
+        </div>
+      </div>
+      <div class="stage-grid" id="customGrid"></div>
       <button class="btn" id="btnCloseStages">Tutup</button>
     </div>
   </div>
 
   <!-- Menang -->
-  <div class="overlay" id="winOverlay" hidden>
-    <div class="modal">
-      <h2>Stage selesai!</h2>
+  <div class="overlay" id="winOverlay" role="dialog" aria-modal="true" aria-labelledby="winTitle" hidden>
+    <div class="modal paper">
+      <h2 id="winTitle">Bab selesai!</h2>
       <div class="win-stars" id="winStars"></div>
       <p id="winText"></p>
       <p class="win-eng" id="winEng"></p>
       <div class="modal-actions">
         <button class="btn" id="btnStay">Ulangi</button>
-        <button class="run small" id="btnNext">Lanjut ›</button>
+        <button class="run small" id="btnNext" data-autofocus>Lanjut ›</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Profil -->
+  <div class="overlay" id="profileOverlay" role="dialog" aria-modal="true" aria-label="Profil" hidden>
+    <div class="modal paper">
+      <div class="profile-head">
+        <div class="avatar" id="profileAvatar"></div>
+        <div>
+          <h2 id="profileName"></h2>
+          <div class="rank" id="profileRank"></div>
+        </div>
+      </div>
+      <div class="rank-bar"><i id="rankFill"></i></div>
+      <p class="rank-next" id="rankNext"></p>
+      <div class="stat-grid" id="statGrid"></div>
+      <h3 class="sec-title">Bintang per bab</h3>
+      <div class="chapter-stars" id="chapterStars"></div>
+      <div class="modal-actions">
+        <button class="btn" id="btnRename">Ganti nama</button>
+        <button class="run small" id="btnCloseProfile" data-autofocus>Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pengaturan -->
+  <div class="overlay" id="settingsOverlay" role="dialog" aria-modal="true" aria-label="Pengaturan" hidden>
+    <div class="modal paper">
+      <h2>Pengaturan</h2>
+      <div class="settings">
+        <div class="set-row">
+          <span>Ukuran teks</span>
+          <div class="seg" id="setText">
+            <button data-v="s">Kecil</button><button data-v="m">Sedang</button><button data-v="l">Besar</button><button data-v="xl">Sangat besar</button>
+          </div>
+        </div>
+        <label class="set-row"><span>Volume musik</span><input type="range" id="setMusic" min="0" max="100"></label>
+        <label class="set-row"><span>Volume efek suara</span><input type="range" id="setSfx" min="0" max="100"></label>
+        <label class="set-row toggle"><span>Kontras tinggi<small>Teks & garis lebih tegas</small></span><input type="checkbox" id="setContrast"><i></i></label>
+        <label class="set-row toggle"><span>Kurangi animasi<small>Matikan transisi & efek gerak UI</small></span><input type="checkbox" id="setMotion"><i></i></label>
+      </div>
+      <div class="modal-actions">
+        <button class="run small" id="btnCloseSettings">Simpan</button>
       </div>
     </div>
   </div>

@@ -25,7 +25,7 @@ export const PROLOG = [
   'Di dalam kastil, monster-monster bangkit dari jasad yang telah kehilangan jiwanya. Sang kesatria menumbangkan satu per satu hingga mencapai menara tertinggi.',
   'Sebelum ia sempat membuka pintu menara, seekor monster yang sengaja menunggu menjebaknya, dan kesatria itu kehilangan penglihatannya. Dari balik pintu, ia mendengar suara sang putri.',
   'Satu-satunya jalan keluar: penglihatan sang putri menjadi mata bagi sang kesatria. Maka kesatria itu menggendong sang putri dan memulai perjalanan keluar dari kastil.',
-  'Kamu adalah suara sang putri. Susun perintah, dan sang kesatria akan melangkah sesuai ucapanmu.',
+  '{pemain}, kamu adalah suara sang putri. Susun perintah, dan sang kesatria akan melangkah sesuai ucapanmu.',
 ];
 
 export const EPILOG = [
@@ -34,12 +34,14 @@ export const EPILOG = [
   'Namun ada satu hal yang tidak diketahui sang kesatria.',
   'Yang ia gendong bukanlah sang putri, melainkan entitas terkutuk yang dapat meniru siapa pun, termasuk suaranya.',
   'Entitas itu telah tersegel ratusan tahun. Kini bebas, ia berencana menebar teror ke seluruh negeri.',
+  'Terima kasih telah menjadi mata sang kesatria, {pemain}. Kisah ini... belum selesai.',
   'Bersambung...',
 ];
 
 // Dialog pembuka tiap stage. Beberapa kalimat putri adalah petunjuk halus plot twist (Bab 3.3 no. 5).
 export const STAGE_INTRO = {
   1: [
+    ['narrator', 'Bab pertama dimulai, {pemain}. Ingat: setiap perintahmu adalah satu langkah sang kesatria.'],
     ['knight', 'Aku tidak bisa melihat apa pun... Putri, kau masih di sana?'],
     ['princess', 'Aku di punggungmu. Dengarkan suaraku. Aku akan menjadi matamu.'],
     ['princess', 'Lantai menara ini sudah rapuh. Ada lubang di beberapa tempat. Langkah demi langkah, ikuti urutan perintahku.'],

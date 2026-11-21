@@ -4,6 +4,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { LEVELS } from './levels.js';
+import { initUI } from './ui.js';
+import { createEditor, newDraft, draftToLevel, encodeDraft, decodeDraft } from './editor.js';
 import { World, DIRS, CONDITIONS } from './world.js';
 import { interpret, LimitError, fromCompact, newId, bumpId, childLists, countBlocks } from './interpreter.js';
 import {
@@ -61,17 +63,27 @@ const lantern = new THREE.PointLight(0xffc080, 6, 4.5, 1.6); // cahaya kecil di 
 scene.add(lantern);
 
 let fit = { hw: 5, hh: 3 };
+// Dunia 3D penuh layar, tapi papan dipusatkan di area yang tidak tertutup panel & bar atas.
 function resize() {
   const w = viewport.clientWidth, h = viewport.clientHeight;
   if (!w || !h) return;
   renderer.setSize(w, h, false);
+  const panel = document.querySelector('.code-panel');
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const desktop = window.innerWidth > 900;
+  const coverX = desktop && panel ? panel.offsetWidth + rem * 2 : 0; // panel kanan
+  const coverY = desktop ? rem * 4.5 : rem * 3.5; // bar atas
+  const visW = Math.max(240, w - coverX), visH = Math.max(200, h - coverY);
+  const v = Math.max(fit.hh * (h / visH), (fit.hw / (visW / visH)) * (h / visH));
   const aspect = w / h;
-  const v = Math.max(fit.hh, fit.hw / aspect);
-  camera.left = -v * aspect; camera.right = v * aspect;
-  camera.top = v; camera.bottom = -v;
+  const dx = (coverX / 2 / w) * (2 * v * aspect);
+  const dy = (coverY / 2 / h) * (2 * v);
+  camera.left = -v * aspect + dx; camera.right = v * aspect + dx;
+  camera.top = v + dy; camera.bottom = -v + dy;
   camera.updateProjectionMatrix();
 }
 new ResizeObserver(resize).observe(viewport);
+window.addEventListener('resize', resize);
 
 // ------------------------------------------------------------
 //  State game
@@ -114,7 +126,7 @@ function getZzTexture() {
   return zzTexture;
 }
 
-function buildBoard() {
+function buildBoard({ resetCamera = true } = {}) {
   disposeGroup(board);
   parts.bridges.clear(); parts.gates.clear(); parts.levers.clear(); parts.spikes.clear(); parts.monsters = [];
 
@@ -280,9 +292,11 @@ function buildBoard() {
 
   const s = W + D;
   fit = { hw: s * 0.38 + 0.4, hh: s * 0.23 + 1.0 };
-  controls.target.set(0, 0.4, 0);
-  camera.position.set(10, 10, 10);
-  camera.zoom = 1;
+  if (resetCamera) {
+    controls.target.set(0, 0.4, 0);
+    camera.position.set(10, 10, 10);
+    camera.zoom = 1;
+  }
   camera.updateProjectionMatrix();
   resize();
 }
@@ -737,7 +751,9 @@ function sfx(kind) {
       click: [[600, 0.03]], eval: [[880, 0.04, 'sine']],
     };
     let w = 0;
-    for (const [f, d, type] of P[kind] || []) { tone(f, d, type || 'square', 0.045, w); w += d * 0.9; }
+    const vol = 0.045 * (settings.sfx / 100);
+    if (vol <= 0) return;
+    for (const [f, d, type] of P[kind] || []) { tone(f, d, type || 'square', vol, w); w += d * 0.9; }
   } catch { /* audio tidak tersedia */ }
 }
 
@@ -751,8 +767,9 @@ function startMusic() {
   musicTimer = setInterval(() => {
     try {
       const n = m.notes[i % m.notes.length];
-      if (i % 16 === 0) tone(midi(m.root - 12), beat * 15, 'sine', 0.02);
-      if (n != null) tone(midi(m.root + n), beat * 1.8, 'triangle', 0.018);
+      const mv = settings.music / 100;
+      if (mv > 0 && i % 16 === 0) tone(midi(m.root - 12), beat * 15, 'sine', 0.02 * mv);
+      if (mv > 0 && n != null) tone(midi(m.root + n), beat * 1.8, 'triangle', 0.018 * mv);
       i++;
     } catch { stopMusic(); }
   }, beat * 1000);
@@ -778,6 +795,37 @@ document.getElementById('btnMute').onclick = () => {
 function store(k, v) { try { localStorage.setItem('kesatria.' + k, JSON.stringify(v)); } catch {} }
 function load(k, d) { try { const v = localStorage.getItem('kesatria.' + k); return v === null ? d : JSON.parse(v); } catch { return d; } }
 const progress = () => ({ unlocked: 1, stars: {}, ...load('progress', {}) });
+
+// ------------------------------------------------------------
+//  Profil pemain, statistik, pengaturan
+// ------------------------------------------------------------
+const player = { name: '', ...load('player', {}) };
+const playerName = () => player.name || 'Pembaca';
+const personalize = (text) => String(text).replaceAll('{pemain}', playerName());
+const stats = { runs: 0, wins: 0, fails: 0, ...load('stats', {}) };
+const bumpStat = (k) => { stats[k] = (stats[k] || 0) + 1; store('stats', stats); };
+
+const settings = { text: 'm', music: 60, sfx: 80, contrast: false, motion: false, ...load('settings', {}) };
+const TEXT_SCALE = { s: 0.9, m: 1, l: 1.15, xl: 1.3 };
+function applySettings() {
+  document.documentElement.style.setProperty('--fs', TEXT_SCALE[settings.text] || 1);
+  document.body.classList.toggle('hc', !!settings.contrast);
+  document.body.classList.toggle('rm', !!settings.motion);
+  requestAnimationFrame(resize);
+}
+
+const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+const chapterOf = (lv) => `BAB ${ROMAN[lv.id] || lv.id}`;
+
+// gelar berdasarkan total bintang
+const RANKS = [
+  [0, 'Pembaca Pemula'], [4, 'Juru Arah'], [8, 'Penjaga Langkah'], [12, 'Insinyur Muda'], [15, 'Arsitek Kastil'],
+];
+function rankFor(stars) {
+  let i = 0;
+  while (i < RANKS.length - 1 && stars >= RANKS[i + 1][0]) i++;
+  return { title: RANKS[i][1], next: RANKS[i + 1] || null, from: RANKS[i][0] };
+}
 
 // ------------------------------------------------------------
 //  Editor blok
@@ -907,8 +955,11 @@ function renderPalette() {
   }
 }
 
-function renderProgram() {
+function renderProgram(focusId) {
   const scroll = programEl.scrollTop;
+  // pertahankan fokus keyboard/gamepad pada blok yang sama setelah render ulang
+  const act = document.activeElement;
+  const keepId = focusId ?? (programEl.contains(act) ? act.closest('.pitem')?.dataset.id : null);
   programEl.innerHTML = '';
   const main = document.createElement('div');
   main.className = 'main-wrap';
@@ -926,7 +977,26 @@ function renderProgram() {
     programEl.appendChild(fw);
   }
   programEl.scrollTop = scroll;
+  if (keepId != null) programEl.querySelector(`.pitem[data-id="${keepId}"]`)?.focus({ preventScroll: false });
 }
+
+function moveNode(id, delta) {
+  const f = findNode(id);
+  if (!f) return;
+  const j = f.index + delta;
+  if (j < 0 || j >= f.list.length) return;
+  [f.list[f.index], f.list[j]] = [f.list[j], f.list[f.index]];
+  sfx('click');
+  changed();
+}
+
+const listName = (listId) => {
+  if (listId === 'main') return 'program utama';
+  if (listId === 'fn') return `fungsi ${fnName}`;
+  const [id, part] = listId.split(':');
+  const n = findNode(+id)?.node;
+  return part === 'else' ? 'bagian "lainnya"' : n?.type === 'if' ? 'bagian "maka"' : 'isi Ulangi';
+};
 
 function renderList(list, listId) {
   const el = document.createElement('div');
@@ -992,6 +1062,30 @@ function renderNode(n, i) {
   el.className = 'pitem';
   el.dataset.id = n.id;
   el.draggable = true;
+  el.tabIndex = 0;
+  el.setAttribute('role', 'listitem');
+  el.setAttribute('aria-label', `${i + 1}. ${n.type === 'call' ? 'Panggil ' + fnName : BLOCKS[n.type].label}`);
+  el.title = 'Delete: hapus · Alt+↑/↓: geser' + (n.type === 'repeat' || n.type === 'if' ? ' · Enter: isi blok ini' : '');
+  el.addEventListener('keydown', (e) => {
+    if (e.target !== el || running) return;
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      const f = findNode(n.id);
+      const next = f && (f.list[f.index + 1] || f.list[f.index - 1]);
+      deleteNode(n.id);
+      if (next) programEl.querySelector(`.pitem[data-id="${next.id}"]`)?.focus();
+      else runBtn.focus();
+    } else if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      e.preventDefault();
+      moveNode(n.id, e.key === 'ArrowUp' ? -1 : 1);
+    } else if ((e.key === 'Enter' || e.key === ' ') && (n.type === 'repeat' || n.type === 'if')) {
+      e.preventDefault();
+      activeList = n.type === 'repeat' ? String(n.id) : `${n.id}:then`;
+      if (n.type === 'if' && e.shiftKey) activeList = `${n.id}:else`;
+      renderProgram(n.id);
+      showToast(`Blok baru akan masuk ke ${listName(activeList)}. Esc untuk kembali.`);
+    }
+  });
   el.style.setProperty('--cat', catVar(n.type));
   const del = '<button class="del" title="Hapus">×</button>';
   const num = `<span class="num">${i + 1}</span>`;
@@ -1112,16 +1206,19 @@ const starsFor = (t) => (t < stage.stars[0] ? 3 : t < stage.stars[1] ? 2 : t < s
 
 function updateHud() {
   const left = stage.time - elapsed;
-  timerEl.textContent = left > 0 ? `⏱ ${fmt(left)}` : '⏱ Waktu habis';
-  timerEl.className = 'chip' + (left <= 0 ? ' over' : left < 20 ? ' warn' : '');
+  // Tulis ke DOM hanya bila nilainya berubah. Peringatan tidak hanya lewat warna: ada ikon/teks juga.
+  const put = (el, prop, v) => { if (el[prop] !== v) el[prop] = v; };
+  put(timerEl, 'textContent', left <= 0 ? '⏱ Waktu habis' : left < 20 ? `⚠ ${fmt(left)}` : `⏱ ${fmt(left)}`);
+  put(timerEl, 'className', 'chip' + (left <= 0 ? ' over' : left < 20 ? ' warn' : ''));
   const s = starsFor(elapsed);
   const nextDrop = s > 0 ? stage.stars[3 - s] - elapsed : 0;
-  starGoalEl.innerHTML = s > 0
-    ? `${'★'.repeat(s)}${'☆'.repeat(3 - s)} <span class="dim">sisa ${fmt(nextDrop)}</span>`
-    : '☆☆☆ <span class="dim">tanpa bintang</span>';
+  put(starGoalEl, 'innerHTML', s > 0
+    ? `<span class="star">${'★'.repeat(s)}${'☆'.repeat(3 - s)}</span> <span class="dim">sisa ${fmt(nextDrop)}</span>`
+    : '<span class="star">☆☆☆</span> <span class="dim">tanpa bintang</span>');
   const n = totalBlocks();
-  blockEl.textContent = stage.limit ? `Blok ${n}/${stage.limit}` : `Blok ${n}`;
-  blockEl.className = 'chip' + (stage.limit && n >= stage.limit ? ' warn' : '');
+  const full = stage.limit && n >= stage.limit;
+  put(blockEl, 'textContent', stage.limit ? `Blok ${n}/${stage.limit}${full ? ' · penuh' : ''}` : `Blok ${n}`);
+  put(blockEl, 'className', 'chip' + (full ? ' warn' : ''));
 }
 
 let lastTick = performance.now();
@@ -1129,7 +1226,8 @@ setInterval(() => {
   const now = performance.now();
   const dt = (now - lastTick) / 1000;
   lastTick = now;
-  const active = !running && !stageDone && blockingUI === 0 && document.getElementById('titleOverlay').hidden && document.visibilityState === 'visible';
+  const menuOpen = !document.getElementById('profileOverlay').hidden || !document.getElementById('settingsOverlay').hidden || !document.getElementById('stageOverlay').hidden;
+  const active = !running && !editing && !stageDone && !menuOpen && blockingUI === 0 && document.getElementById('titleOverlay').hidden && document.visibilityState === 'visible';
   if (!active) return;
   elapsed += dt;
   if (elapsed >= stage.time && !timeUpWarned) {
@@ -1170,6 +1268,7 @@ function setRunning(v) {
 async function run() {
   if (running || stageDone) return;
   if (!program.length) return showToast('Tambahkan blok dulu');
+  bumpStat('runs');
   closeDialog();
   const token = ++runToken;
   world.reset();
@@ -1214,25 +1313,33 @@ async function run() {
 function onFail(reason) {
   sfx('fail');
   failCount++;
-  const hint = HINTS[stage.id][Math.min(failCount, 3) - 1];
+  bumpStat('fails');
+  const hint = hintsFor(stage)[Math.min(failCount, 3) - 1];
   say([['princess', FAIL_LINES[reason]], ['princess', hint]]);
 }
 
 function onWin() {
   stageDone = true;
   sfx('win');
+  bumpStat('wins');
   const s = starsFor(elapsed);
-  const p = progress();
-  p.stars[stage.id] = Math.max(p.stars[stage.id] || 0, s);
-  p.unlocked = Math.max(p.unlocked, Math.min(LEVELS.length, stage.id + 1));
-  store('progress', p);
+  if (stage.custom) {
+    const dft = customs().find((c) => c.id === stage.id);
+    if (dft) { dft.verified = true; dft.best = Math.max(dft.best ?? 0, s); saveCustom(dft); }
+  } else {
+    const p = progress();
+    p.stars[stage.id] = Math.max(p.stars[stage.id] || 0, s);
+    p.unlocked = Math.max(p.unlocked, Math.min(LEVELS.length, stage.id + 1));
+    store('progress', p);
+  }
   document.getElementById('winStars').innerHTML =
     `${'★'.repeat(s)}<span class="off">${'★'.repeat(3 - s)}</span>`;
+  document.getElementById('winTitle').textContent = stage.custom ? 'Level selesai!' : `${chapterOf(stage)} selesai!`;
   document.getElementById('winText').textContent =
-    `Waktu menyusun ${fmt(elapsed)} · ${totalBlocks()} blok. "${WIN_LINES[stage.id]}"`;
+    `Bagus sekali, ${playerName()}! Waktu menyusun ${fmt(elapsed)} · ${totalBlocks()} blok. "${WIN_LINES[stage.id] ?? 'Level buatanmu berhasil diselesaikan!'}"`;
   document.getElementById('winEng').innerHTML =
     `<b>Konsep:</b> ${stage.concept}<br><b>Engineering:</b> ${stage.engineering}`;
-  document.getElementById('btnNext').textContent = stage.id === LEVELS.length ? 'Epilog ›' : 'Stage berikutnya ›';
+  document.getElementById('btnNext').textContent = stage.custom ? 'Edit level ›' : stage.id === LEVELS.length ? 'Epilog ›' : 'Bab berikutnya ›';
   setTimeout(() => { document.getElementById('winOverlay').hidden = false; }, 500);
 }
 
@@ -1278,7 +1385,7 @@ function showLine() {
   const sp = SPEAKERS[who];
   document.getElementById('dlgIcon').textContent = sp.icon;
   document.getElementById('dlgName').textContent = sp.name;
-  document.getElementById('dlgText').textContent = text;
+  document.getElementById('dlgText').textContent = personalize(text);
   document.getElementById('dlgNext').textContent = i < lines.length - 1 ? 'Lanjut ›' : 'Tutup';
   dialogEl.hidden = false;
 }
@@ -1297,7 +1404,7 @@ document.getElementById('dlgNext').onclick = () => {
 };
 document.getElementById('btnHint').onclick = () => {
   sfx('click');
-  say([['princess', HINTS[stage.id][Math.min(failCount, 2)]]]);
+  say([['princess', hintsFor(stage)[Math.min(failCount, 2)]]]);
 };
 
 const storyEl = document.getElementById('storyOverlay');
@@ -1308,7 +1415,7 @@ function playStory(label, slides) {
     const show = () => {
       document.getElementById('storyLabel').textContent = label;
       const p = document.getElementById('storyText');
-      p.textContent = slides[i];
+      p.textContent = personalize(slides[i]);
       p.style.animation = 'none'; void p.offsetWidth; p.style.animation = '';
       document.getElementById('storyDots').textContent = `${i + 1} / ${slides.length}`;
       document.getElementById('storyNext').textContent = i < slides.length - 1 ? 'Lanjut ›' : 'Selesai';
@@ -1330,18 +1437,26 @@ function playStory(label, slides) {
 // ------------------------------------------------------------
 //  Alur stage
 // ------------------------------------------------------------
-async function loadStage(index, { intro = true } = {}) {
+const CUSTOM_HINTS = [
+  'Putar kamera dengan menyeret untuk melihat peta dari sudut lain. Rencanakan jalurnya dulu.',
+  'Pecah jalur menjadi bagian kecil. Ada pola yang berulang? Gunakan Ulangi atau Fungsi.',
+  'Kalau ada monster, tanyakan padaku: Jika monster tertidur, Maju; lainnya Tunggu.',
+];
+const hintsFor = (lv) => HINTS[lv.id] || CUSTOM_HINTS;
+
+async function startLevel(lv, { intro = true } = {}) {
   runToken++;
   setRunning(false);
   highlight(null);
   closeDialog();
-  stage = LEVELS[index];
+  exitEditor();
+  stage = lv;
   world = new World(stage);
-  store('last', index);
-  document.getElementById('stageTitle').textContent = `STAGE ${stage.id}`;
+  if (!lv.custom) store('last', LEVELS.indexOf(lv));
+  document.getElementById('stageTitle').textContent = lv.custom ? 'LEVEL CUSTOM' : chapterOf(stage);
   document.getElementById('stageSub').textContent = stage.name;
   document.getElementById('concept').innerHTML =
-    `Konsep: <b>${stage.concept}</b><br>Engineering: <b>${stage.engineering}</b>`;
+    `Konsep: <b>${esc(stage.concept)}</b><br>Engineering: <b>${esc(stage.engineering)}</b>`;
   document.getElementById('clearLabel').textContent = stage.initialProgram ? 'Muat ulang program' : 'Hapus semua';
   buildBoard();
   applyMonsterModels();
@@ -1355,12 +1470,89 @@ async function loadStage(index, { intro = true } = {}) {
   timeUpWarned = false;
   updateHud();
   startMusic();
-  if (intro && STAGE_INTRO[stage.id]) await say(STAGE_INTRO[stage.id], { blocking: true });
+  if (!intro) return;
+  if (STAGE_INTRO[stage.id]) await say(STAGE_INTRO[stage.id], { blocking: true });
+  else if (lv.custom) say([['princess', `Level buatan: "${lv.name}". Ayo kita coba!`]]);
+}
+const loadStage = (index, opts) => startLevel(LEVELS[index], opts);
+
+// ------------------------------------------------------------
+//  Level custom + editor
+// ------------------------------------------------------------
+const customs = () => load('custom', []);
+function saveCustom(d) {
+  const list = customs();
+  const i = list.findIndex((c) => c.id === d.id);
+  if (i >= 0) list[i] = structuredClone(d); else list.push(structuredClone(d));
+  store('custom', list);
+}
+function deleteCustom(id) {
+  store('custom', customs().filter((c) => c.id !== id));
+  try { localStorage.removeItem('kesatria.prog.' + id); } catch {}
 }
 
 const titleEl = document.getElementById('titleOverlay');
 const stageOverlay = document.getElementById('stageOverlay');
 const winOverlay = document.getElementById('winOverlay');
+
+let editing = false;
+const editor = createEditor(document.getElementById('editorView'), {
+  preview(level, { resetCamera }) {
+    stage = level;
+    world = new World(level);
+    buildBoard({ resetCamera });
+    applyMonsterModels();
+    resetVisual();
+    document.getElementById('stageSub').textContent = level.name;
+  },
+  save: saveCustom,
+  play(d) { saveCustom(d); startLevel(draftToLevel(d)); },
+  share(d) { shareCode(encodeDraft(d)); },
+  close(d) { saveCustom(d); exitEditor(); startLevel(draftToLevel(d), { intro: false }); openStages(); },
+  toast: (m) => showToast(m),
+  sfx,
+});
+
+function enterEditor(draft) {
+  runToken++;
+  setRunning(false);
+  closeDialog();
+  editing = true;
+  document.body.classList.add('editing');
+  titleEl.hidden = true;
+  stageOverlay.hidden = true;
+  winOverlay.hidden = true;
+  document.getElementById('stageTitle').textContent = 'EDITOR';
+  document.getElementById('concept').innerHTML = 'Mode editor: gambar peta di panel kanan.<br>Pratinjau 3D diperbarui otomatis.';
+  editor.open(draft);
+}
+function exitEditor() {
+  if (!editing) return;
+  editing = false;
+  document.body.classList.remove('editing');
+}
+
+async function shareCode(code) {
+  try {
+    await navigator.clipboard.writeText(code);
+    showToast('Kode level disalin. Tempel ke teman untuk dibagikan!');
+  } catch {
+    window.prompt('Salin kode level ini:', code);
+  }
+}
+function importCode() {
+  const code = window.prompt('Tempel kode level (diawali MSK1:)');
+  if (!code) return;
+  try {
+    const d = decodeDraft(code);
+    d.id = 'c' + Date.now().toString(36);
+    saveCustom(d);
+    showToast(`Level "${d.name}" berhasil diimpor`);
+    openStages();
+  } catch (e) {
+    showToast(e.message);
+  }
+}
 
 function openStages() {
   const grid = document.getElementById('stageGrid');
@@ -1372,25 +1564,61 @@ function openStages() {
     const st = p.stars[lv.id];
     b.className = 'stage-card' + (lv === stage && titleEl.hidden ? ' current' : '');
     b.disabled = locked;
-    b.innerHTML = `<span class="no">${locked ? '🔒 ' : ''}Stage ${lv.id}</span>
+    b.innerHTML = `<span class="no">${locked ? '🔒 ' : ''}${chapterOf(lv)}</span>
       <span class="nm">${lv.name}</span><span class="cp">${lv.concept}</span>
       <span class="st">${st != null ? '★'.repeat(st) + '☆'.repeat(3 - st) : '&nbsp;'}</span>`;
     b.onclick = () => { stageOverlay.hidden = true; titleEl.hidden = true; audio(); loadStage(i); };
     grid.appendChild(b);
   });
+
+  const cg = document.getElementById('customGrid');
+  cg.innerHTML = '';
+  const list = customs();
+  if (!list.length) cg.innerHTML = '<p class="empty-custom">Belum ada level buatan. Buat sendiri atau impor kode dari teman.</p>';
+  for (const d of list) {
+    const card = document.createElement('div');
+    card.className = 'stage-card custom' + (stage.id === d.id && titleEl.hidden ? ' current' : '');
+    const size = `${d.map[0].length}×${d.map.length}`;
+    card.innerHTML = `<span class="nm">${esc(d.name)}</span>
+      <span class="cp">${size} · ${d.verified ? '✓ sudah diuji' : 'belum diuji'}</span>
+      <span class="st">${d.best != null ? '★'.repeat(d.best) + '☆'.repeat(3 - d.best) : '&nbsp;'}</span>
+      <div class="card-actions">
+        <button class="run small" data-a="play">Main</button>
+        <button class="btn" data-a="edit">Edit</button>
+        <button class="btn" data-a="share" title="Salin kode">Kode</button>
+        <button class="btn danger" data-a="del" title="Hapus level"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>
+      </div>`;
+    card.querySelector('[data-a=play]').onclick = () => { stageOverlay.hidden = true; titleEl.hidden = true; audio(); startLevel(draftToLevel(d)); };
+    card.querySelector('[data-a=edit]').onclick = () => { audio(); enterEditor(d); };
+    card.querySelector('[data-a=share]').onclick = () => shareCode(encodeDraft(d));
+    card.querySelector('[data-a=del]').onclick = () => {
+      if (!window.confirm(`Hapus level "${d.name}"? Tindakan ini tidak bisa dibatalkan.`)) return;
+      deleteCustom(d.id);
+      openStages();
+    };
+    cg.appendChild(card);
+  }
   stageOverlay.hidden = false;
 }
+function newLevel() { audio(); const d = newDraft(); saveCustom(d); enterEditor(d); }
 document.getElementById('btnStages').onclick = openStages;
 document.getElementById('btnTitleStages').onclick = openStages;
 document.getElementById('btnCloseStages').onclick = () => { stageOverlay.hidden = true; };
 stageOverlay.onclick = (e) => { if (e.target === stageOverlay) stageOverlay.hidden = true; };
+document.getElementById('btnNewLevel').onclick = newLevel;
+document.getElementById('btnImport').onclick = importCode;
+document.getElementById('btnTitleEditor').onclick = newLevel;
 
 document.getElementById('btnStay').onclick = () => {
   winOverlay.hidden = true;
-  loadStage(LEVELS.indexOf(stage), { intro: false });
+  startLevel(stage, { intro: false });
 };
 document.getElementById('btnNext').onclick = async () => {
   winOverlay.hidden = true;
+  if (stage.custom) {
+    const d = customs().find((c) => c.id === stage.id);
+    return d ? enterEditor(d) : openStages();
+  }
   const i = LEVELS.indexOf(stage);
   if (i < LEVELS.length - 1) return loadStage(i + 1);
   stopMusic();
@@ -1400,7 +1628,28 @@ document.getElementById('btnNext').onclick = async () => {
 
 document.getElementById('gameTitle').textContent = GAME_TITLE;
 document.title = GAME_TITLE;
+// ---------- sampul: nama pemain ----------
+const nameInput = document.getElementById('nameInput');
+function renderTitle() {
+  const has = !!player.name;
+  document.getElementById('nameField').hidden = has;
+  const w = document.getElementById('welcomeText');
+  w.hidden = !has;
+  if (has) {
+    w.innerHTML = `Selamat datang kembali, <b>${esc(player.name)}</b>. <button id="btnNotMe">bukan kamu?</button>`;
+    w.querySelector('#btnNotMe').onclick = () => { player.name = ''; nameInput.value = ''; renderTitle(); nameInput.focus(); };
+  }
+}
+function setName(n) {
+  player.name = n.trim().slice(0, 20);
+  store('player', player);
+}
+nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('btnPlay').click(); });
+
 document.getElementById('btnPlay').onclick = async () => {
+  // Nama boleh kosong (mis. pemain gamepad tanpa keyboard) -> "Pembaca", bisa diganti di Profil.
+  if (!player.name) setName(nameInput.value.trim() || 'Pembaca');
+  renderTitle();
   audio();
   titleEl.hidden = true;
   if (!load('seenProlog', false)) {
@@ -1420,6 +1669,106 @@ document.getElementById('btnProlog').onclick = async () => {
 // ------------------------------------------------------------
 //  Mulai
 // ------------------------------------------------------------
+// ---------- profil ----------
+const profileOverlay = document.getElementById('profileOverlay');
+function openProfile() {
+  const p = progress();
+  const total = LEVELS.reduce((s, lv) => s + (p.stars[lv.id] || 0), 0);
+  const max = LEVELS.length * 3;
+  const done = LEVELS.filter((lv) => p.stars[lv.id] != null).length;
+  const cl = customs();
+  const r = rankFor(total);
+  document.getElementById('profileAvatar').textContent = playerName()[0].toUpperCase();
+  document.getElementById('profileName').textContent = playerName();
+  document.getElementById('profileRank').innerHTML = `Gelar: <b>${r.title}</b>`;
+  const pct = r.next ? ((total - r.from) / (r.next[0] - r.from)) * 100 : 100;
+  document.getElementById('rankFill').style.width = `${Math.max(4, pct)}%`;
+  document.getElementById('rankNext').textContent = r.next
+    ? `${r.next[0] - total} bintang lagi untuk menjadi "${r.next[1]}"`
+    : 'Gelar tertinggi! Semua bintang terkumpul.';
+  const tile = (n, label) => `<div class="stat"><b>${n}</b><span>${label}</span></div>`;
+  document.getElementById('statGrid').innerHTML = [
+    tile(`${total}/${max}`, 'bintang'),
+    tile(`${done}/${LEVELS.length}`, 'bab selesai'),
+    tile(stats.runs, 'kali dijalankan'),
+    tile(stats.wins, 'kemenangan'),
+    tile(cl.length, 'level dibuat'),
+    tile(cl.filter((c) => c.verified).length, 'level teruji'),
+  ].join('');
+  document.getElementById('chapterStars').innerHTML = LEVELS.map((lv) => {
+    const st = p.stars[lv.id];
+    const right = lv.id > p.unlocked ? '<span class="lock">terkunci</span>'
+      : st != null ? `<span class="st">${'★'.repeat(st)}${'☆'.repeat(3 - st)}</span>` : '<span class="lock">belum selesai</span>';
+    return `<div><span>${chapterOf(lv)} · ${esc(lv.name)}</span>${right}</div>`;
+  }).join('');
+  profileOverlay.hidden = false;
+}
+document.getElementById('btnProfile').onclick = openProfile;
+document.getElementById('btnTitleProfile').onclick = openProfile;
+document.getElementById('btnCloseProfile').onclick = () => { profileOverlay.hidden = true; };
+profileOverlay.onclick = (e) => { if (e.target === profileOverlay) profileOverlay.hidden = true; };
+document.getElementById('btnRename').onclick = () => {
+  const n = window.prompt('Nama baru:', player.name);
+  if (n && n.trim()) { setName(n); renderTitle(); openProfile(); }
+};
+
+// ---------- pengaturan ----------
+const settingsOverlay = document.getElementById('settingsOverlay');
+function openSettings() {
+  document.querySelectorAll('#setText button').forEach((b) => b.classList.toggle('on', b.dataset.v === settings.text));
+  document.getElementById('setMusic').value = settings.music;
+  document.getElementById('setSfx').value = settings.sfx;
+  document.getElementById('setContrast').checked = settings.contrast;
+  document.getElementById('setMotion').checked = settings.motion;
+  settingsOverlay.hidden = false;
+}
+const saveSettings = () => { store('settings', settings); applySettings(); };
+document.querySelectorAll('#setText button').forEach((b) => {
+  b.onclick = () => { settings.text = b.dataset.v; saveSettings(); openSettings(); };
+});
+document.getElementById('setMusic').oninput = (e) => { settings.music = +e.target.value; saveSettings(); };
+document.getElementById('setSfx').oninput = (e) => { settings.sfx = +e.target.value; saveSettings(); };
+document.getElementById('setSfx').onchange = () => sfx('click');
+document.getElementById('setContrast').onchange = (e) => { settings.contrast = e.target.checked; saveSettings(); };
+document.getElementById('setMotion').onchange = (e) => { settings.motion = e.target.checked; saveSettings(); };
+document.getElementById('btnSettings').onclick = openSettings;
+document.getElementById('btnTitleSettings').onclick = openSettings;
+document.getElementById('btnCloseSettings').onclick = () => { settingsOverlay.hidden = true; };
+settingsOverlay.onclick = (e) => { if (e.target === settingsOverlay) settingsOverlay.hidden = true; };
+
+// ---------- shell UI: screen stack, fokus, keyboard & gamepad ----------
+// "Kembali" (Esc / tombol B): tutup layar teratas, lalu dialog, lalu keluar dari wadah blok.
+function goBack() {
+  if (!settingsOverlay.hidden) { settingsOverlay.hidden = true; return; }
+  if (!profileOverlay.hidden) { profileOverlay.hidden = true; return; }
+  if (!stageOverlay.hidden) { stageOverlay.hidden = true; return; }
+  if (!winOverlay.hidden) { document.getElementById('btnStay').click(); return; }
+  if (!storyEl.hidden) { document.getElementById('storySkip').click(); return; }
+  if (!titleEl.hidden) return;
+  if (dialogState) { document.getElementById('dlgNext').click(); return; }
+  if (editing) return;
+  if (activeList !== 'main') {
+    const owner = ownerOf(activeList);
+    activeList = 'main';
+    renderProgram(owner);
+    showToast('Blok baru kembali masuk ke program utama');
+  }
+}
+const isOpen = (id) => !document.getElementById(id).hidden;
+initUI({
+  app: document.querySelector('.app'),
+  overlays: [...document.querySelectorAll('.overlay')],
+  actions: {
+    back: goBack,
+    run: () => { if (isOpen('titleOverlay') || editing) return; runBtn.click(); },
+    hint: () => { if (!isOpen('titleOverlay') && !editing) document.getElementById('btnHint').click(); },
+    menu: () => { if (isOpen('settingsOverlay')) settingsOverlay.hidden = true; else openSettings(); },
+    toast: (m) => showToast(m),
+  },
+});
+
+applySettings();
+renderTitle();
 muted = load('muted', false);
 renderMute();
 loadStage(Math.min(load('last', 0), progress().unlocked - 1), { intro: false });
