@@ -546,3 +546,59 @@ textarea.ask-field { font-family: ui-monospace, Consolas, monospace; font-size: 
 @media (max-width: 900px), (pointer: coarse) {
   .ed-tool kbd, .ed-help, .ed-label .dim { display: none; }
 }
+
+/* ---------- kartu blok baru / kamus blok ---------- */
+.pal-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.pal-btn { position: relative; }
+.pal-btn.new::after {
+  content: "BARU"; position: absolute; top: -0.45rem; right: -0.3rem;
+  font-family: var(--title-font); font-weight: 700; font-size: 0.6rem; letter-spacing: 0.08em;
+  background: var(--wax); color: #fbeedd; padding: 0.05rem 0.35rem; border-radius: 0.3rem;
+  box-shadow: 0 1px 3px #0005;
+}
+.block-card { width: min(27rem, 100%); padding-top: 1.4rem; }
+.block-card h2 { margin-bottom: 0.3rem; }
+.block-card h2::before, .block-card h2::after { content: none; }
+.bk-kicker {
+  display: inline-block; font-family: var(--title-font); font-weight: 900; letter-spacing: 0.15em; font-size: 0.8rem;
+  color: #fbeedd; background: var(--wax); padding: 0.2rem 0.8rem; border-radius: 999px; margin-bottom: 0.7rem;
+}
+.bk-kicker.dict { background: var(--ink-soft); }
+.bk-icon {
+  width: 4.2rem; height: 4.2rem; margin: 0 auto 0.5rem; border-radius: 1rem; display: grid; place-items: center;
+  background: var(--paper-3); border: 2px solid var(--cat); color: var(--cat);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--cat) 18%, transparent), 0 4px 10px #3b2a1a33;
+  animation: bk-pop 0.45s cubic-bezier(.2,1.6,.4,1);
+}
+.bk-icon svg { width: 2.2rem; height: 2.2rem; stroke-width: 2.2; }
+@keyframes bk-pop { from { transform: scale(0.4) rotate(-12deg); opacity: 0; } }
+.bk-desc { color: var(--ink) !important; font-size: 1rem; line-height: 1.55; margin: 0 0 0.9rem; }
+.bk-example { text-align: left; background: #fbf3df99; border: 1px dashed #3b2a1a55; border-radius: 0.5rem; padding: 0.6rem 0.7rem; }
+.bk-ex-label { font-family: var(--title-font); font-weight: 700; font-size: 0.75rem; letter-spacing: 0.1em; color: var(--ink-soft); margin-bottom: 0.4rem; }
+.bk-program { display: flex; flex-direction: column; gap: 0.3rem; }
+.bk-program .pitem { cursor: default; box-shadow: none; }
+.bk-program .fn-def { margin-top: 0.4rem; border-top: 1px dashed #3b2a1a55; padding-top: 0.4rem; }
+.bk-program .fn-def .list-label { margin-bottom: 0.3rem; }
+.bk-program .pitem.hl { border-color: var(--wax); border-left-color: var(--cat); box-shadow: 0 0 0 2px #9c2f2f33; }
+.bk-note { margin: 0.5rem 0 0; font-size: 0.92rem; color: var(--ink) !important; }
+.bk-note::before { content: "→ "; color: var(--wax); font-weight: 700; }
+.bk-tip { font-size: 0.85rem; font-style: italic; margin: 0.7rem 0 0; }
+.bk-tip::before { content: "💡 "; font-style: normal; }
+.bk-dots { display: flex; justify-content: center; gap: 0.35rem; margin-top: 0.8rem; }
+.bk-dots i { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: #3b2a1a33; }
+.bk-dots i.on { background: var(--wax); }
+/* setelah kartu ditutup: tunjukkan letak blok baru di palet */
+.pal-btn.new.flash { animation: glow-again 1.1s ease-in-out 3; }
+@keyframes glow-again { 50% { box-shadow: 0 0 0 3px var(--wax); transform: translateY(-2px); } }
+/* layar pendek: kartu blok lebih padat agar tombol tetap terlihat */
+@media (max-height: 900px) {
+  .block-card { padding: 1rem 1.2rem; }
+  .bk-icon { width: 3rem; height: 3rem; margin-bottom: 0.3rem; }
+  .bk-icon svg { width: 1.6rem; height: 1.6rem; }
+  .bk-kicker { margin-bottom: 0.4rem; }
+  .bk-desc { font-size: 0.92rem; margin-bottom: 0.5rem; }
+  .bk-program .pitem { padding: 0.2rem 0.45rem; }
+  .bk-tip { margin-top: 0.4rem; }
+  .bk-dots { margin-top: 0.4rem; }
+  .block-card .modal-actions { margin-top: 0.6rem; }
+}

@@ -5,6 +5,7 @@ import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { LEVELS } from './levels.js';
 import { initUI } from './ui.js';
+import { BLOCK_INFO } from './blocks-info.js';
 import { createEditor, newDraft, draftToLevel, encodeDraft, decodeDraft } from './editor.js';
 import { World, DIRS, CONDITIONS } from './world.js';
 import { interpret, LimitError, fromCompact, newId, bumpId, childLists, countBlocks } from './interpreter.js';
@@ -938,7 +939,8 @@ function renderPalette() {
   const prev = LEVELS[LEVELS.indexOf(stage) - 1];
   for (const type of stage.blocks) {
     const b = document.createElement('button');
-    b.className = 'pal-btn' + (prev && !prev.blocks.includes(type) ? ' new' : '');
+    const introduced = prev ? !prev.blocks.includes(type) : !stage.custom; // blok yang dikenalkan di bab ini
+    b.className = 'pal-btn' + (introduced ? ' new' : '');
     b.style.setProperty('--cat', catVar(type));
     b.draggable = true;
     b.innerHTML = `${svg(type)}<span>${BLOCKS[type].label}</span>`;
@@ -1239,7 +1241,7 @@ setInterval(() => {
   const now = performance.now();
   const dt = (now - lastTick) / 1000;
   lastTick = now;
-  const menuOpen = !document.getElementById('askOverlay').hidden || !document.getElementById('profileOverlay').hidden || !document.getElementById('settingsOverlay').hidden || !document.getElementById('stageOverlay').hidden;
+  const menuOpen = !document.getElementById('blockOverlay').hidden || !document.getElementById('askOverlay').hidden || !document.getElementById('profileOverlay').hidden || !document.getElementById('settingsOverlay').hidden || !document.getElementById('stageOverlay').hidden;
   const active = !running && !editing && !stageDone && !menuOpen && blockingUI === 0 && document.getElementById('titleOverlay').hidden && document.visibilityState === 'visible';
   if (!active) return;
   elapsed += dt;
@@ -1487,7 +1489,92 @@ async function startLevel(lv, { intro = true } = {}) {
   if (!intro) return;
   if (STAGE_INTRO[stage.id]) await say(STAGE_INTRO[stage.id], { blocking: true });
   else if (lv.custom) say([['princess', `Level buatan: "${lv.name}". Ayo kita coba!`]]);
+  // Kartu "Blok Baru!" untuk blok yang belum pernah dikenalkan ke pemain
+  if (stage !== lv) return; // pemain sudah pindah bab saat dialog berlangsung
+  const seen = new Set(load('seenBlocks', []));
+  const fresh = lv.blocks.filter((b) => !seen.has(b));
+  if (fresh.length) {
+    await showBlockCards(fresh, { isNew: true });
+    store('seenBlocks', [...seen, ...fresh]);
+  }
 }
+
+// ------------------------------------------------------------
+//  Kartu blok baru / kamus blok
+// ------------------------------------------------------------
+const SHORT_TYPE = { maju: 'move', kiri: 'left', kanan: 'right', lompat: 'jump', tuas: 'lever', tunggu: 'wait', panggil: 'call' };
+function miniList(list, hl, fnLabel) { return list.map((it, i) => miniNode(it, i, hl, fnLabel)).join(''); }
+function miniNode(it, i, hl, fnLabel) {
+  const num = `<span class="num">${i + 1}</span>`;
+  if (typeof it === 'string') {
+    const t = SHORT_TYPE[it];
+    const lbl = t === 'call' ? `Panggil <b>${esc(fnLabel)}</b>` : BLOCKS[t].label;
+    return `<div class="pitem${t === hl ? ' hl' : ''}" role="listitem" style="--cat:${catVar(t)}">${num}${svg(t)}<span class="lbl">${lbl}</span></div>`;
+  }
+  const [kind, a, b, c] = it;
+  if (kind === 'ulangi') {
+    return `<div class="pitem box${hl === 'repeat' ? ' hl' : ''}" role="listitem" style="--cat:${catVar('repeat')}">
+      <div class="rhead">${num}${svg('repeat')}<span>Ulangi <b>${a}</b> kali</span></div>
+      <div class="plist rbody">${miniList(b, hl, fnLabel)}</div></div>`;
+  }
+  return `<div class="pitem box${hl === 'if' ? ' hl' : ''}" role="listitem" style="--cat:${catVar('if')}">
+    <div class="rhead">${num}${svg('if')}<span>Jika <b>${CONDITIONS[a]}</b> maka</span></div>
+    <div class="plist rbody">${miniList(b, hl, fnLabel)}</div>
+    <div class="else-label">lainnya</div>
+    <div class="plist rbody">${miniList(c || [], hl, fnLabel)}</div></div>`;
+}
+
+const blockOverlay = document.getElementById('blockOverlay');
+let blockCardsDone = null;
+function showBlockCards(types, { isNew }) {
+  blockCardsDone?.();
+  const list = types.filter((t) => BLOCK_INFO[t]);
+  if (!list.length) return Promise.resolve();
+  let i = 0;
+  const $ = (id) => document.getElementById(id);
+  const draw = () => {
+    const t = list[i];
+    const info = BLOCK_INFO[t];
+    const card = blockOverlay.querySelector('.block-card');
+    card.style.setProperty('--cat', catVar(t));
+    $('bkKicker').textContent = isNew ? (list.length > 1 ? `BLOK BARU! ${i + 1}/${list.length}` : 'BLOK BARU!') : `KAMUS BLOK ${i + 1}/${list.length}`;
+    $('bkKicker').classList.toggle('dict', !isNew);
+    const icon = $('bkIcon');
+    icon.innerHTML = svg(t);
+    icon.style.animation = 'none'; void icon.offsetWidth; icon.style.animation = '';
+    $('bkName').textContent = BLOCKS[t].label;
+    $('bkDesc').textContent = info.desc;
+    const fnLabel = info.fnName || fnName;
+    $('bkExample').innerHTML = miniList(info.example, t, fnLabel)
+      + (info.fn ? `<div class="fn-def"><div class="list-label">${svg('call')} Fungsi ${esc(fnLabel)}</div>${miniList(info.fn, t, fnLabel)}</div>` : '');
+    $('bkNote').textContent = info.note;
+    $('bkTip').textContent = info.tip;
+    $('bkDots').innerHTML = list.length > 1 ? list.map((_, j) => `<i class="${j === i ? 'on' : ''}"></i>`).join('') : '';
+    $('bkPrev').hidden = i === 0;
+    $('bkNext').textContent = i < list.length - 1 ? 'Lanjut ›' : isNew ? 'Mengerti!' : 'Tutup';
+  };
+  return new Promise((resolve) => {
+    blockCardsDone = () => {
+      blockCardsDone = null;
+      blockOverlay.hidden = true;
+      document.querySelectorAll('.pal-btn.new').forEach((b) => b.classList.add('flash'));
+      resolve();
+    };
+    $('bkPrev').onclick = () => { if (i > 0) { i--; draw(); sfx('click'); $('bkNext').focus(); } };
+    $('bkNext').onclick = () => { sfx('click'); if (i < list.length - 1) { i++; draw(); } else blockCardsDone(); };
+    draw();
+    if (isNew) sfx('win');
+    blockOverlay.hidden = false;
+  });
+}
+document.getElementById('btnBlockInfo').onclick = () => {
+  // blok yang baru di bab ini tampil lebih dulu
+  const prev = LEVELS[LEVELS.indexOf(stage) - 1];
+  const isFresh = (t) => prev && !prev.blocks.includes(t);
+  const order = [...stage.blocks.filter(isFresh), ...stage.blocks.filter((t) => !isFresh(t))];
+  showBlockCards(order, { isNew: false });
+};
+blockOverlay.onclick = (e) => { if (e.target === blockOverlay) blockCardsDone?.(); };
 const loadStage = (index, opts) => startLevel(LEVELS[index], opts);
 
 // ------------------------------------------------------------
@@ -1821,6 +1908,7 @@ settingsOverlay.onclick = (e) => { if (e.target === settingsOverlay) settingsOve
 // "Kembali" (Esc / tombol B): tutup layar teratas, lalu dialog, lalu keluar dari wadah blok.
 function goBack() {
   if (!askEl.hidden) { askResolve?.(null); return; }
+  if (!blockOverlay.hidden) { blockCardsDone?.(); return; }
   if (!settingsOverlay.hidden) { settingsOverlay.hidden = true; return; }
   if (!profileOverlay.hidden) { profileOverlay.hidden = true; return; }
   if (!stageOverlay.hidden) { stageOverlay.hidden = true; return; }
