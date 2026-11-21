@@ -253,6 +253,26 @@
     </div>
   </div>
 
+  <!-- Dialog pembuka stage (pop-up modal) -->
+  <div class="overlay" id="dialogOverlay" role="dialog" aria-modal="true" aria-labelledby="dlgPopName" aria-describedby="dlgPopText" hidden>
+    <div class="modal paper dialog-card">
+      <div class="dlg-top">
+        <div class="dlg-kicker" id="dlgPopKicker"></div>
+        <button class="link-btn dlg-skip" id="dlgPopSkip" type="button">Lewati</button>
+        <div class="portrait lg" id="dlgPopIcon" aria-hidden="true"></div>
+        <h2 class="dlg-pop-name" id="dlgPopName"></h2>
+      </div>
+      <div class="dlg-pop-body" id="dlgPopBody">
+        <p class="dlg-pop-text" id="dlgPopText"></p>
+      </div>
+      <div class="bk-nav dlg-nav">
+        <button class="btn" id="dlgPopPrev" type="button">‹ Sebelumnya</button>
+        <div class="bk-dots" id="dlgPopDots" aria-hidden="true"></div>
+        <button class="run small" id="dlgPopNext" type="button" data-autofocus>Lanjut ›</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal in-game (konfirmasi / isian) -->
   <div class="overlay" id="askOverlay" role="dialog" aria-modal="true" aria-labelledby="askTitle" aria-describedby="askText" hidden>
     <div class="modal paper ask">

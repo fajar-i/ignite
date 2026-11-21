@@ -619,3 +619,56 @@ textarea.ask-field { font-family: ui-monospace, Consolas, monospace; font-size: 
 .bk-nav .bk-dots { margin: 0; }
 /* tombol Petunjuk jangan menimpa kotak dialog */
 .app:has(.dialog:not([hidden])) .hint-btn { visibility: hidden; }
+
+/* ---------- pop-up dialog pembuka stage ---------- */
+.dialog-card {
+  width: min(32rem, 100%); padding-top: 1.4rem;
+  display: flex; flex-direction: column; overflow: hidden;
+  min-height: min(23rem, calc(100dvh - 2rem));
+  max-height: min(30rem, calc(100dvh - 2rem));
+}
+.dialog-card h2::before, .dialog-card h2::after { content: none; }
+.dlg-top { flex: none; position: relative; }
+.dlg-kicker {
+  display: inline-block; font-family: var(--title-font); font-weight: 900; letter-spacing: 0.12em; font-size: 0.78rem;
+  color: #fbeedd; background: var(--wax); padding: 0.2rem 0.8rem; border-radius: 999px;
+  margin-bottom: 0.75rem; max-width: calc(100% - 6rem);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dlg-skip { position: absolute; top: 0; right: 0; padding: 0.15rem 0.2rem; }
+.portrait.lg {
+  width: 4.4rem; height: 4.4rem; font-size: 2.1rem; margin: 0 auto 0.55rem;
+  animation: bk-pop 0.35s cubic-bezier(.2,1.6,.4,1);
+}
+.dialog-card[data-speaker="knight"] .portrait.lg {
+  background: radial-gradient(circle at 35% 30%, #547dad, var(--c-move) 60%, #264161);
+}
+.dialog-card[data-speaker="narrator"] .portrait.lg {
+  background: radial-gradient(circle at 35% 30%, #c99543, var(--c-ctrl) 60%, #7a5216);
+}
+.dlg-pop-name { font-size: 1.35rem; margin-bottom: 0.25rem; color: var(--wax); }
+.dialog-card[data-speaker="knight"] .dlg-pop-name { color: var(--c-move); }
+.dialog-card[data-speaker="narrator"] .dlg-pop-name { color: var(--gold-ink); }
+.dlg-pop-body {
+  flex: 1; min-height: 5.5rem; overflow-y: auto;
+  display: flex; align-items: center; justify-content: center; padding: 0.5rem 0.6rem;
+}
+.dlg-pop-text {
+  color: var(--ink) !important; font-size: clamp(1.02rem, 2vw, 1.18rem); line-height: 1.65;
+  margin: 0; animation: fade 0.3s;
+}
+.dlg-nav #dlgPopPrev { justify-self: start; }
+.dlg-nav #dlgPopNext { justify-self: end; min-width: 8.5rem; }
+
+@media (max-height: 700px) {
+  .dialog-card { padding: 1rem 1.2rem; min-height: 0; }
+  .dlg-kicker { margin-bottom: 0.45rem; }
+  .portrait.lg { width: 3.4rem; height: 3.4rem; font-size: 1.65rem; margin-bottom: 0.35rem; }
+  .dlg-pop-name { font-size: 1.15rem; }
+  .dlg-pop-body { min-height: 4rem; padding: 0.3rem 0.4rem; }
+}
+@media (max-width: 520px) {
+  .dialog-card { padding: 1.1rem 1.1rem 1rem; }
+  .dlg-kicker { max-width: calc(100% - 4.8rem); font-size: 0.72rem; }
+  .dlg-nav #dlgPopNext { min-width: 6.8rem; }
+}

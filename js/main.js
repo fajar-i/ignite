@@ -1241,7 +1241,7 @@ setInterval(() => {
   const now = performance.now();
   const dt = (now - lastTick) / 1000;
   lastTick = now;
-  const menuOpen = !document.getElementById('blockOverlay').hidden || !document.getElementById('askOverlay').hidden || !document.getElementById('profileOverlay').hidden || !document.getElementById('settingsOverlay').hidden || !document.getElementById('stageOverlay').hidden;
+  const menuOpen = !document.getElementById('blockOverlay').hidden || !document.getElementById('dialogOverlay').hidden || !document.getElementById('askOverlay').hidden || !document.getElementById('profileOverlay').hidden || !document.getElementById('settingsOverlay').hidden || !document.getElementById('stageOverlay').hidden;
   const active = !running && !editing && !stageDone && !menuOpen && blockingUI === 0 && document.getElementById('titleOverlay').hidden && document.visibilityState === 'visible';
   if (!active) return;
   elapsed += dt;
@@ -1384,20 +1384,57 @@ function showToast(msg) {
 }
 
 const dialogEl = document.getElementById('dialog');
+const dialogOverlay = document.getElementById('dialogOverlay');
+const dlgPopCard = dialogOverlay.querySelector('.dialog-card');
+const dlgPopKicker = document.getElementById('dlgPopKicker');
+const dlgPopIcon = document.getElementById('dlgPopIcon');
+const dlgPopName = document.getElementById('dlgPopName');
+const dlgPopText = document.getElementById('dlgPopText');
+const dlgPopBody = document.getElementById('dlgPopBody');
+const dlgPopDots = document.getElementById('dlgPopDots');
+const dlgPopPrev = document.getElementById('dlgPopPrev');
+const dlgPopNext = document.getElementById('dlgPopNext');
+const dlgPopSkip = document.getElementById('dlgPopSkip');
 let dialogState = null;
 function say(lines, { blocking = false } = {}) {
   closeDialog();
   return new Promise((resolve) => {
-    dialogState = { lines, i: 0, resolve, blocking };
+    dialogState = { lines, i: 0, resolve, blocking, lastSpeaker: null };
     if (blocking) blockingUI++;
     dialogEl.classList.toggle('blocking', blocking);
     showLine();
   });
 }
 function showLine() {
-  const { lines, i } = dialogState;
+  const { lines, i, blocking } = dialogState;
   const [who, text] = lines[i];
   const sp = SPEAKERS[who];
+  if (blocking) {
+    dialogEl.hidden = true;
+    dlgPopKicker.textContent = stage.custom ? stage.name : `${chapterOf(stage)} · ${stage.name}`;
+    dlgPopCard.dataset.speaker = who;
+    dlgPopIcon.textContent = sp.icon;
+    if (dialogState.lastSpeaker !== who) {
+      dlgPopIcon.style.animation = 'none';
+      void dlgPopIcon.offsetWidth;
+      dlgPopIcon.style.animation = '';
+      dialogState.lastSpeaker = who;
+    }
+    dlgPopName.textContent = sp.name;
+    dlgPopText.textContent = personalize(text);
+    dlgPopText.style.animation = 'none';
+    void dlgPopText.offsetWidth;
+    dlgPopText.style.animation = '';
+    dlgPopBody.scrollTop = 0;
+    dlgPopDots.innerHTML = lines.length > 1
+      ? lines.map((_, j) => `<i class="${j === i ? 'on' : ''}"></i>`).join('')
+      : '';
+    dlgPopPrev.style.visibility = i === 0 ? 'hidden' : 'visible';
+    dlgPopNext.textContent = i < lines.length - 1 ? 'Lanjut ›' : 'Mulai!';
+    if (dialogOverlay.hidden) dialogOverlay.hidden = false;
+    return;
+  }
+  dialogOverlay.hidden = true;
   document.getElementById('dlgIcon').textContent = sp.icon;
   document.getElementById('dlgName').textContent = sp.name;
   document.getElementById('dlgText').textContent = personalize(text);
@@ -1410,12 +1447,30 @@ function closeDialog() {
   dialogState = null;
   if (s.blocking) blockingUI--;
   dialogEl.hidden = true;
+  dialogOverlay.hidden = true;
   s.resolve();
 }
 document.getElementById('dlgNext').onclick = () => {
   if (!dialogState) return;
   sfx('click');
   if (dialogState.i < dialogState.lines.length - 1) { dialogState.i++; showLine(); } else closeDialog();
+};
+dlgPopNext.onclick = () => {
+  if (!dialogState) return;
+  sfx('click');
+  if (dialogState.i < dialogState.lines.length - 1) { dialogState.i++; showLine(); } else closeDialog();
+};
+dlgPopPrev.onclick = () => {
+  if (!dialogState || dialogState.i <= 0) return;
+  sfx('click');
+  dialogState.i--;
+  showLine();
+  if (dialogState.i === 0) dlgPopNext.focus();
+};
+dlgPopSkip.onclick = () => {
+  if (!dialogState) return;
+  sfx('click');
+  closeDialog();
 };
 document.getElementById('btnHint').onclick = () => {
   sfx('click');
@@ -1497,7 +1552,7 @@ async function startLevel(lv, { intro = true, introduceBlocks = false } = {}) {
   if (fresh.length) {
     store('seenBlocks', [...new Set([...seen, ...fresh])]); // tandai saat ditampilkan, agar tidak muncul ulang
     await showBlockCards(fresh, { isNew: true });
-    if (stage !== lv) return; // pemain sudah pindah bab saat kartu terbuka
+    if (stage !== lv || !titleEl.hidden) return; // pemain sudah pindah bab atau kembali ke sampul saat kartu terbuka
   }
   if (STAGE_INTRO[stage.id]) await say(STAGE_INTRO[stage.id], { blocking: true });
   else if (lv.custom) say([['princess', `Level buatan: "${lv.name}". Ayo kita coba!`]]);
@@ -1915,6 +1970,7 @@ settingsOverlay.onclick = (e) => { if (e.target === settingsOverlay) settingsOve
 function goBack() {
   if (!askEl.hidden) { askResolve?.(null); return; }
   if (!blockOverlay.hidden) { blockCardsDone?.(); return; }
+  if (!dialogOverlay.hidden) { closeDialog(); return; }
   if (!settingsOverlay.hidden) { settingsOverlay.hidden = true; return; }
   if (!profileOverlay.hidden) { profileOverlay.hidden = true; return; }
   if (!stageOverlay.hidden) { stageOverlay.hidden = true; return; }
@@ -1958,13 +2014,15 @@ function goToMenu() {
 document.getElementById('btnHome').onclick = goToMenu;
 
 const isOpen = (id) => !document.getElementById(id).hidden;
+const overlays = [...document.querySelectorAll('.overlay')];
+const anyOverlayOpen = () => overlays.some((o) => !o.hidden);
 initUI({
   app: document.querySelector('.app'),
-  overlays: [...document.querySelectorAll('.overlay')],
+  overlays,
   actions: {
     back: goBack,
-    run: () => { if (isOpen('titleOverlay') || editing) return; runBtn.click(); },
-    hint: () => { if (!isOpen('titleOverlay') && !editing) document.getElementById('btnHint').click(); },
+    run: () => { if (anyOverlayOpen() || editing) return; runBtn.click(); },
+    hint: () => { if (!anyOverlayOpen() && !editing) document.getElementById('btnHint').click(); },
     menu: () => { if (isOpen('settingsOverlay')) settingsOverlay.hidden = true; else openSettings(); },
     toast: (m) => showToast(m),
   },
