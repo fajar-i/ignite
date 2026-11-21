@@ -1459,7 +1459,9 @@ const CUSTOM_HINTS = [
 ];
 const hintsFor = (lv) => HINTS[lv.id] || CUSTOM_HINTS;
 
-async function startLevel(lv, { intro = true } = {}) {
+// introduceBlocks: tampilkan kartu blok yang dikenalkan di bab ini walau sudah pernah dilihat
+// (dipakai tombol "Bab berikutnya").
+async function startLevel(lv, { intro = true, introduceBlocks = false } = {}) {
   runToken++;
   setRunning(false);
   highlight(null);
@@ -1487,16 +1489,18 @@ async function startLevel(lv, { intro = true } = {}) {
   updateHud();
   startMusic();
   if (!intro) return;
+  // Kartu "Blok Baru!" langsung saat bab dibuka, sebelum dialog cerita.
+  const seen = new Set(load('seenBlocks', []));
+  const prev = LEVELS[LEVELS.indexOf(lv) - 1];
+  const introducedHere = (b) => (prev ? !prev.blocks.includes(b) : !lv.custom);
+  const fresh = lv.blocks.filter((b) => !seen.has(b) || (introduceBlocks && introducedHere(b)));
+  if (fresh.length) {
+    store('seenBlocks', [...new Set([...seen, ...fresh])]); // tandai saat ditampilkan, agar tidak muncul ulang
+    await showBlockCards(fresh, { isNew: true });
+    if (stage !== lv) return; // pemain sudah pindah bab saat kartu terbuka
+  }
   if (STAGE_INTRO[stage.id]) await say(STAGE_INTRO[stage.id], { blocking: true });
   else if (lv.custom) say([['princess', `Level buatan: "${lv.name}". Ayo kita coba!`]]);
-  // Kartu "Blok Baru!" untuk blok yang belum pernah dikenalkan ke pemain
-  if (stage !== lv) return; // pemain sudah pindah bab saat dialog berlangsung
-  const seen = new Set(load('seenBlocks', []));
-  const fresh = lv.blocks.filter((b) => !seen.has(b));
-  if (fresh.length) {
-    await showBlockCards(fresh, { isNew: true });
-    store('seenBlocks', [...seen, ...fresh]);
-  }
 }
 
 // ------------------------------------------------------------
@@ -1550,7 +1554,9 @@ function showBlockCards(types, { isNew }) {
     $('bkNote').textContent = info.note;
     $('bkTip').textContent = info.tip;
     $('bkDots').innerHTML = list.length > 1 ? list.map((_, j) => `<i class="${j === i ? 'on' : ''}"></i>`).join('') : '';
-    $('bkPrev').hidden = i === 0;
+    // sembunyikan tanpa menghilangkan tempatnya, agar tombol Lanjut tidak bergeser
+    $('bkPrev').style.visibility = i === 0 ? 'hidden' : 'visible';
+    $('bkBody').scrollTop = 0;
     $('bkNext').textContent = i < list.length - 1 ? 'Lanjut ›' : isNew ? 'Mengerti!' : 'Tutup';
   };
   return new Promise((resolve) => {
@@ -1786,7 +1792,7 @@ document.getElementById('btnNext').onclick = async () => {
     return d ? enterEditor(d) : openStages();
   }
   const i = LEVELS.indexOf(stage);
-  if (i < LEVELS.length - 1) return loadStage(i + 1);
+  if (i < LEVELS.length - 1) return loadStage(i + 1, { introduceBlocks: true });
   stopMusic();
   await playStory('Epilog', EPILOG);
   titleEl.hidden = false;
@@ -1930,6 +1936,27 @@ function goBack() {
     showToast('Blok baru kembali masuk ke program utama');
   }
 }
+// Kembali ke menu utama (sampul). Program & level custom sudah tersimpan otomatis.
+function goToMenu() {
+  runToken++;
+  setRunning(false);
+  highlight(null);
+  closeDialog();
+  askResolve?.(null);
+  blockCardsDone?.();
+  if (editing) {
+    if (editor.draft) saveCustom(editor.draft);
+    exitEditor();
+  }
+  for (const o of [settingsOverlay, profileOverlay, stageOverlay, winOverlay]) o.hidden = true;
+  world.reset();
+  resetVisual();
+  stopMusic();
+  renderTitle();
+  titleEl.hidden = false;
+}
+document.getElementById('btnHome').onclick = goToMenu;
+
 const isOpen = (id) => !document.getElementById(id).hidden;
 initUI({
   app: document.querySelector('.app'),

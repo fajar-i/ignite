@@ -33,6 +33,9 @@
         <div class="chip" id="blockCount"></div>
       </div>
       <div class="top-actions">
+        <button class="icon-btn" id="btnHome" title="Kembali ke menu utama" aria-label="Menu utama">
+          <svg viewBox="0 0 24 24"><path d="M3 11 12 3l9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
+        </button>
         <button class="icon-btn" id="btnEditLevel" title="Kembali ke editor level" aria-label="Edit level ini" hidden>
           <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
         </button>
@@ -227,19 +230,24 @@
   <!-- Kartu blok baru / kamus blok -->
   <div class="overlay" id="blockOverlay" role="dialog" aria-modal="true" aria-labelledby="bkName" aria-describedby="bkDesc" hidden>
     <div class="modal paper block-card">
-      <div class="bk-kicker" id="bkKicker"></div>
-      <div class="bk-icon" id="bkIcon" aria-hidden="true"></div>
-      <h2 id="bkName"></h2>
-      <p class="bk-desc" id="bkDesc"></p>
-      <div class="bk-example">
-        <div class="bk-ex-label">Contoh penggunaan</div>
-        <div class="bk-program" id="bkExample" role="list" aria-label="Contoh program"></div>
-        <p class="bk-note" id="bkNote"></p>
+      <div class="bk-top">
+        <div class="bk-kicker" id="bkKicker"></div>
+        <div class="bk-icon" id="bkIcon" aria-hidden="true"></div>
+        <h2 id="bkName"></h2>
       </div>
-      <p class="bk-tip" id="bkTip"></p>
-      <div class="bk-dots" id="bkDots" aria-hidden="true"></div>
-      <div class="modal-actions">
+      <!-- isi bisa di-scroll; tinggi kartu tetap agar tombol tidak berpindah antar halaman -->
+      <div class="bk-body" id="bkBody">
+        <p class="bk-desc" id="bkDesc"></p>
+        <div class="bk-example">
+          <div class="bk-ex-label">Contoh penggunaan</div>
+          <div class="bk-program" id="bkExample" role="list" aria-label="Contoh program"></div>
+          <p class="bk-note" id="bkNote"></p>
+        </div>
+        <p class="bk-tip" id="bkTip"></p>
+      </div>
+      <div class="bk-nav">
         <button class="btn" id="bkPrev">‹ Sebelumnya</button>
+        <div class="bk-dots" id="bkDots" aria-hidden="true"></div>
         <button class="run small" id="bkNext" data-autofocus>Lanjut ›</button>
       </div>
     </div>
