@@ -493,3 +493,15 @@ body.rm *, body.rm *::before, body.rm *::after { animation: none !important; tra
   content: "↳ blok baru masuk ke sini"; display: block; font-size: 0.72rem; font-style: italic; color: var(--gold-ink); margin: 0 0 0.1rem 0.2rem;
 }
 .main-wrap > .plist.active::before { content: none; }
+
+/* ---------- catatan rencana putri (Bab V, debugging) ---------- */
+.plan-note {
+  background: #fff1c4; border: 1px solid var(--gold); border-left: 0.3rem solid var(--wax);
+  border-radius: 0.45rem; padding: 0.45rem 0.6rem; margin-bottom: 0.5rem;
+  font-size: 0.85rem; line-height: 1.45;
+}
+.plan-note b { color: var(--wax); }
+.plan-note span { display: block; font-style: italic; color: var(--ink-soft); font-size: 0.78rem; margin-top: 0.15rem; }
+
+/* layar desktop sempit: HUD bisa turun baris dan bertabrakan dengan teks konsep */
+@media (max-width: 1200px) and (min-width: 901px) { .concept { display: none; } }

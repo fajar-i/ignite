@@ -963,7 +963,13 @@ function renderProgram(focusId) {
   programEl.innerHTML = '';
   const main = document.createElement('div');
   main.className = 'main-wrap';
-  if (hasFn()) main.innerHTML = '<div class="list-label">Program utama</div>';
+  if (stage.initialProgram && programOwner === stage.id) {
+    main.insertAdjacentHTML('beforeend', `<div class="plan-note">
+      <b>Rencana dari putri</b> — berisi 3 bug, bukan kodemu dari bab lain.
+      Jalankan, lihat di mana kesatria gagal, lalu perbaiki.
+      <span>Tombol "Muat ulang program" mengembalikan rencana ini.</span></div>`);
+  }
+  if (hasFn()) main.insertAdjacentHTML('beforeend', '<div class="list-label">Program utama</div>');
   main.appendChild(renderList(program, 'main'));
   programEl.appendChild(main);
 
@@ -1167,8 +1173,15 @@ document.addEventListener('drop', (e) => {
 });
 
 const maxId = (list) => list.reduce((m, n) => Math.max(m, n.id, ...childLists(n).map(maxId)), 0);
-function saveProgram() { store('prog.' + stage.id, { program, fnBody, fnName }); }
+// Program selalu disimpan ke stage pemiliknya (yang memuatnya), bukan `stage` yang sedang
+// tampil: pratinjau editor mengganti `stage` tanpa mengganti program.
+let programOwner = null;
+function saveProgram() {
+  if (programOwner == null) return;
+  store('prog.' + programOwner, { program, fnBody, fnName });
+}
 function loadProgram() {
+  programOwner = stage.id;
   const saved = load('prog.' + stage.id, null);
   if (saved) {
     program = saved.program || [];
