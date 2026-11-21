@@ -1,0 +1,118 @@
+// ============================================================
+//  Cerita, dialog, dan hint (Bab 3 & 6.3).
+//  Nama tokoh masih placeholder -> ganti di NAMES.
+// ============================================================
+
+export const GAME_TITLE = 'Mata Sang Kesatria'; // [TBD] judul sementara
+export const NAMES = {
+  princess: 'Putri',
+  knight: 'Kesatria',
+  king: 'Raja',
+  land: 'Negeri yang Terlupakan',
+};
+
+export const SPEAKERS = {
+  princess: { name: NAMES.princess, icon: '👸' },
+  knight: { name: NAMES.knight, icon: '🛡️' },
+  narrator: { name: 'Narator', icon: '📜' },
+};
+
+export const PROLOG = [
+  'Hiduplah seorang putri di sebuah kerajaan ternama, di tanah yang indah dan megah. Suatu hari, sang putri berkelana ke Negeri yang Terlupakan untuk mencari Harta yang Terlupakan.',
+  'Menurut cerita masyarakat, harta itu tersimpan di sebuah kastil tua yang telah usang. Sang putri menjelajahi kastil itu hingga tiba di menara tertingginya. Di sana, harta itu benar-benar ada.',
+  'Namun harta itu menyimpan racun yang melumpuhkan kedua kakinya, dan sang putri pun terjebak di menara.',
+  'Enam bulan berlalu tanpa kabar. Sang raja mengutus kesatria kepercayaannya untuk mencari putri. Ia menyusul ke Negeri yang Terlupakan dan menemukan kastil yang sama.',
+  'Di dalam kastil, monster-monster bangkit dari jasad yang telah kehilangan jiwanya. Sang kesatria menumbangkan satu per satu hingga mencapai menara tertinggi.',
+  'Sebelum ia sempat membuka pintu menara, seekor monster yang sengaja menunggu menjebaknya, dan kesatria itu kehilangan penglihatannya. Dari balik pintu, ia mendengar suara sang putri.',
+  'Satu-satunya jalan keluar: penglihatan sang putri menjadi mata bagi sang kesatria. Maka kesatria itu menggendong sang putri dan memulai perjalanan keluar dari kastil.',
+  'Kamu adalah suara sang putri. Susun perintah, dan sang kesatria akan melangkah sesuai ucapanmu.',
+];
+
+export const EPILOG = [
+  'Fajar menyingsing. Untuk pertama kalinya setelah sekian lama, udara terasa hangat.',
+  'Kesatria dan sang putri kembali menuju tanah kelahiran mereka. Sang kesatria tersenyum: ia berhasil.',
+  'Namun ada satu hal yang tidak diketahui sang kesatria.',
+  'Yang ia gendong bukanlah sang putri, melainkan entitas terkutuk yang dapat meniru siapa pun, termasuk suaranya.',
+  'Entitas itu telah tersegel ratusan tahun. Kini bebas, ia berencana menebar teror ke seluruh negeri.',
+  'Bersambung...',
+];
+
+// Dialog pembuka tiap stage. Beberapa kalimat putri adalah petunjuk halus plot twist (Bab 3.3 no. 5).
+export const STAGE_INTRO = {
+  1: [
+    ['knight', 'Aku tidak bisa melihat apa pun... Putri, kau masih di sana?'],
+    ['princess', 'Aku di punggungmu. Dengarkan suaraku. Aku akan menjadi matamu.'],
+    ['princess', 'Lantai menara ini sudah rapuh. Ada lubang di beberapa tempat. Langkah demi langkah, ikuti urutan perintahku.'],
+  ],
+  2: [
+    ['princess', 'Ini lorong perpustakaan tua. Ada jebakan duri yang berulang dengan pola yang sama.'],
+    ['knight', 'Buku-buku ini... apa isinya, Putri?'],
+    ['princess', 'Hanya catatan usang. Tidak penting. ...Terus saja jalan.'],
+    ['princess', 'Polanya berulang. Daripada menyebutkan satu per satu, gunakan Ulangi.'],
+  ],
+  3: [
+    ['knight', 'Bunyi detak ini... roda gigi. Semua ini mesin buatan manusia.'],
+    ['princess', 'Ada monster penjaga. Mereka bergantian tidur dan bangun, dan aku tidak bisa menebak kapan.'],
+    ['princess', 'Aku akan melaporkan apa yang kulihat. Gunakan Jika: kalau monster tidur, lewat. Kalau bangun, tunggu.'],
+    ['princess', 'Sudah lama sekali aku mendengar detak jam ini. ...Enam bulan, maksudku.'],
+  ],
+  4: [
+    ['knight', 'Udaranya berbau racun. Kakiku mulai lemas.'],
+    ['princess', 'Ada tiga jembatan di atas sungai racun. Cara menyeberanginya selalu sama.'],
+    ['princess', 'Buat satu Fungsi untuk menyeberang, lalu panggil berulang kali.'],
+    ['knight', 'Putri, tanganmu dingin sekali.'],
+    ['princess', 'Racun itu... ya. Racun itu.'],
+  ],
+  5: [
+    ['princess', 'Gerbang kastil! Tapi golem penjaga masih berjaga, dan jembatan angkatnya macet.'],
+    ['princess', 'Aku sudah menyusun rencana, tapi sepertinya ada yang salah. Coba jalankan, lalu perbaiki bagian yang keliru.'],
+    ['princess', 'Sedikit lagi. Sedikit lagi aku bebas... kita bebas.'],
+  ],
+};
+
+// Hint bertingkat: umum -> spesifik -> sebagian solusi.
+export const HINTS = {
+  1: [
+    'Bayangkan jalurnya dulu sebelum menyusun blok. Ke mana kesatria harus menghadap?',
+    'Ada lubang dua langkah di depan. Belok kanan dulu, turun dua petak, lalu belok kiri.',
+    'Awal solusi: Belok Kanan, Maju, Maju, Belok Kiri, Maju, Maju, ...',
+  ],
+  2: [
+    'Lihat polanya: lantai, lalu duri. Lantai, lalu duri. Pola ini berulang.',
+    'Maju satu petak, lalu Lompat melewati duri. Masukkan dua blok itu ke dalam Ulangi.',
+    'Ulangi 4 kali { Maju, Lompat }, lalu satu Maju terakhir ke pintu.',
+  ],
+  3: [
+    'Monster bangun dan tidur secara acak. Jangan menghafal waktu; tanyakan padaku setiap langkah.',
+    'Jika ada monster di depan: Jika monster tertidur, Maju; lainnya Tunggu. Jika tidak ada monster: Jika ada jebakan, Lompat; lainnya Maju.',
+    'Bungkus satu "langkah aman" dalam Ulangi 10 kali. Setelah itu: Tarik Tuas, Belok Kanan, Maju, Maju, Belok Kanan, lalu langkah aman lagi.',
+  ],
+  4: [
+    'Ketiga jembatan disusun sama: tuas, jembatan, papan patah, jembatan, daratan.',
+    'Isi Fungsi dengan: Tarik Tuas, Maju, Lompat, Maju. Lalu panggil fungsi itu di tiap jembatan.',
+    'Program utama: Maju, Panggil, Belok Kanan, Maju, Panggil, Belok Kiri, Maju, Panggil, Maju.',
+  ],
+  5: [
+    'Jalankan dulu programnya dan perhatikan di mana kesatria gagal. Itu petunjuk letak bug.',
+    'Ada tiga bug: satu kondisi terbalik, satu belokan salah arah, dan satu perulangan yang kelebihan.',
+    'Monster tertidur? harus berisi Maju (bukan Tunggu). Ganti Belok Kiri menjadi Belok Kanan. Ulangi Maju cukup 3 kali.',
+  ],
+};
+
+export const FAIL_LINES = {
+  fall: 'Hati-hati! Kita jatuh. Petak itu tidak punya pijakan.',
+  river: 'Racun! Petak itu air, bukan jembatan. Apakah tuasnya sudah ditarik?',
+  trap: 'Aduh, duri! Gunakan Lompat untuk melewatinya.',
+  caught: 'Monster itu bangun dan menangkap kita! Tunggu sampai ia tertidur.',
+  incomplete: 'Perintahnya habis, tapi kita belum sampai di pintu keluar.',
+  steps: 'Perintahnya terlalu panjang atau berputar terus. Periksa perulanganmu.',
+  depth: 'Fungsi itu memanggil dirinya sendiri terus-menerus. Jangan panggil fungsi di dalam dirinya sendiri.',
+};
+
+export const WIN_LINES = {
+  1: 'Kita berhasil turun! Kau mulai percaya pada suaraku, bukan?',
+  2: 'Lorongnya terlewati. Satu pola, diulang. Rapi sekali.',
+  3: 'Mesinnya kita kalahkan dengan membaca keadaan. Seperti seorang insinyur.',
+  4: 'Tiga jembatan, satu fungsi. Kau hemat tenaga.',
+  5: 'Gerbangnya terbuka... Akhirnya. Akhirnya.',
+};

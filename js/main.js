@@ -1,0 +1,1425 @@
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { LEVELS } from './levels.js';
+import { World, DIRS, CONDITIONS } from './world.js';
+import { interpret, LimitError, fromCompact, newId, bumpId, childLists, countBlocks } from './interpreter.js';
+import {
+  GAME_TITLE, SPEAKERS, PROLOG, EPILOG, STAGE_INTRO, HINTS, FAIL_LINES, WIN_LINES,
+} from './story.js';
+
+// ============================================================
+//  MODEL 3D (.glb / .gltf / .fbx, mis. dari Mixamo)
+//  url    : path file, relatif terhadap index.html. null = kapsul placeholder.
+//  height : tinggi model di dunia game (1 petak = 1). Skala dihitung otomatis.
+//           Isi `scale` sebagai gantinya kalau mau angka manual.
+//  rotationY: koreksi arah hadap (radian). Model harus menghadap +Z.
+//  walkClip : nama/urutan klip animasi jalan (Mixamo: 0). Diputar hanya
+//             saat kesatria bergerak; root motion dibuang otomatis.
+//  idleUrl  : file animasi diam (Mixamo, boleh "Without Skin"). null = tanpa idle.
+// ============================================================
+const KNIGHT_MODEL = { url: 'Walking.fbx', idleUrl: 'Idle.fbx', height: 0.95, rotationY: 0, yOffset: 0, walkClip: 0 };
+const PRINCESS_MODEL = { url: null, height: 0.35, rotationY: 0, offset: [0, 0.62, -0.24] };
+const MONSTER_MODEL = { url: null, height: 0.9, rotationY: 0, yOffset: 0 };
+const GOLEM_MODEL = { url: null, height: 1.1, rotationY: 0, yOffset: 0 };
+
+const H = 0.5; // tinggi lantai
+
+// ------------------------------------------------------------
+//  Three.js setup
+// ------------------------------------------------------------
+const viewport = document.getElementById('viewport');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+viewport.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enablePan = false;
+controls.enableDamping = true;
+controls.minZoom = 0.6;
+controls.maxZoom = 3;
+controls.minPolarAngle = 0.25;
+controls.maxPolarAngle = Math.PI * 0.42;
+
+const hemi = new THREE.HemisphereLight(0xd8f0ee, 0x0a1d20, 1.2);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+sun.position.set(-5, 12, 6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 12, bottom: -12, near: 1, far: 40 });
+sun.shadow.bias = -0.0008;
+scene.add(sun);
+const lantern = new THREE.PointLight(0xffc080, 6, 4.5, 1.6); // cahaya kecil di sekitar kesatria
+scene.add(lantern);
+
+let fit = { hw: 5, hh: 3 };
+function resize() {
+  const w = viewport.clientWidth, h = viewport.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false);
+  const aspect = w / h;
+  const v = Math.max(fit.hh, fit.hw / aspect);
+  camera.left = -v * aspect; camera.right = v * aspect;
+  camera.top = v; camera.bottom = -v;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(viewport);
+
+// ------------------------------------------------------------
+//  State game
+// ------------------------------------------------------------
+let stage = LEVELS[0];
+let world = new World(stage);
+const board = new THREE.Group();
+scene.add(board);
+const parts = { bridges: new Map(), gates: new Map(), levers: new Map(), spikes: new Map(), monsters: [] };
+
+const worldX = (x) => x - (world.def.W - 1) / 2;
+const worldZ = (z) => z - (world.def.D - 1) / 2;
+const angleFor = (dir) => Math.atan2(DIRS[dir][0], DIRS[dir][1]);
+const key = (x, z) => `${x},${z}`;
+
+// ------------------------------------------------------------
+//  Board
+// ------------------------------------------------------------
+const std = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.9, ...extra });
+const lighten = (hex, l) => new THREE.Color(hex).offsetHSL(0, 0, l);
+
+function disposeGroup(g) {
+  g.traverse((o) => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) [].concat(o.material).forEach((m) => { m.map?.dispose(); m.dispose(); });
+  });
+  g.clear();
+}
+
+let zzTexture = null;
+function getZzTexture() {
+  if (zzTexture) return zzTexture;
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 64;
+  const g = c.getContext('2d');
+  g.font = 'bold 44px Nunito, sans-serif';
+  g.fillStyle = '#cfe3ff';
+  g.fillText('z', 18, 52); g.font = 'bold 32px Nunito, sans-serif'; g.fillText('z', 52, 34); g.font = 'bold 22px Nunito, sans-serif'; g.fillText('z', 80, 18);
+  zzTexture = new THREE.CanvasTexture(c);
+  return zzTexture;
+}
+
+function buildBoard() {
+  disposeGroup(board);
+  parts.bridges.clear(); parts.gates.clear(); parts.levers.clear(); parts.spikes.clear(); parts.monsters = [];
+
+  const th = stage.theme;
+  const { W, D, cells } = world.def;
+  const topM = std(lighten(th.top, 0)), sideM = std(th.side);
+  const wallTop = std(lighten(th.wall, 0.08)), wallSide = std(th.wall);
+  const edgeM = new THREE.LineBasicMaterial({ color: lighten(th.top, 0.18), transparent: true, opacity: 0.4 });
+  const waterM = std(th.river || '#2d6cdf', { emissive: th.river || '#2d6cdf', emissiveIntensity: 0.18, transparent: true, opacity: 0.85, roughness: 0.3 });
+  const bedM = std(lighten(th.side, -0.05));
+  const metalM = std(0xc8ccd2, { metalness: 0.7, roughness: 0.35 });
+  const woodM = std(0x8a5a2b);
+  const goldM = std(0xe0b04a, { metalness: 0.6, roughness: 0.4 });
+
+  const tileGeo = new THREE.BoxGeometry(1, H, 1);
+  const tileEdges = new THREE.EdgesGeometry(tileGeo);
+  const WALL_H = 0.85;
+  const wallGeo = new THREE.BoxGeometry(1, WALL_H, 1);
+  const wallEdges = new THREE.EdgesGeometry(wallGeo);
+
+  const addTile = (x, z) => {
+    const m = new THREE.Mesh(tileGeo, [sideM, sideM, topM, sideM, sideM, sideM]);
+    m.position.set(worldX(x), H / 2, worldZ(z));
+    m.castShadow = m.receiveShadow = true;
+    m.add(new THREE.LineSegments(tileEdges, edgeM));
+    board.add(m);
+  };
+  const addWater = (x, z) => {
+    const bed = new THREE.Mesh(new THREE.BoxGeometry(1, 0.12, 1), bedM);
+    bed.position.set(worldX(x), 0.06, worldZ(z));
+    bed.receiveShadow = true;
+    const w = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), waterM);
+    w.rotation.x = -Math.PI / 2;
+    w.position.set(worldX(x), 0.28, worldZ(z));
+    w.userData.water = true;
+    board.add(bed, w);
+  };
+
+  for (let z = 0; z < D; z++) {
+    for (let x = 0; x < W; x++) {
+      const c = cells[z][x];
+      const wx = worldX(x), wz = worldZ(z);
+      if (c.kind === 'hole') continue;
+      if (c.kind === 'wall') {
+        const m = new THREE.Mesh(wallGeo, [wallSide, wallSide, wallTop, wallSide, wallSide, wallSide]);
+        m.position.set(wx, WALL_H / 2, wz);
+        m.castShadow = m.receiveShadow = true;
+        m.add(new THREE.LineSegments(wallEdges, edgeM));
+        board.add(m);
+        continue;
+      }
+      if (c.kind === 'river' || c.kind === 'bridge') {
+        addWater(x, z);
+        if (c.kind === 'bridge') {
+          const plank = new THREE.Group();
+          for (let i = -1; i <= 1; i++) {
+            const p = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.1, 0.96), woodM);
+            p.position.x = i * 0.31;
+            p.castShadow = p.receiveShadow = true;
+            plank.add(p);
+          }
+          plank.position.set(wx, 0.05, wz);
+          plank.userData = { yOpen: H - 0.05, yClosed: -0.1 };
+          plank.userData.target = plank.userData.yClosed;
+          board.add(plank);
+          if (!parts.bridges.has(c.id)) parts.bridges.set(c.id, []);
+          parts.bridges.get(c.id).push(plank);
+        }
+        continue;
+      }
+      addTile(x, z);
+
+      if (c.kind === 'spikes') {
+        const g = new THREE.Group();
+        for (const [ox, oz] of [[-0.2, -0.2], [0.2, -0.2], [-0.2, 0.2], [0.2, 0.2], [0, 0]]) {
+          const s = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.3, 6), metalM);
+          s.position.set(ox, 0.15, oz);
+          s.castShadow = true;
+          g.add(s);
+        }
+        g.position.set(wx, H, wz);
+        board.add(g);
+        parts.spikes.set(key(x, z), g);
+      }
+      if (c.kind === 'gate') {
+        const g = new THREE.Group();
+        for (let i = -2; i <= 2; i++) {
+          const bar = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.1, 0.07), metalM);
+          bar.position.set(i * 0.2, 0.55, 0);
+          bar.castShadow = true;
+          g.add(bar);
+        }
+        const cross = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.08, 0.09), metalM);
+        cross.position.y = 0.85;
+        g.add(cross);
+        // orientasi palang tegak lurus arah lewat
+        const open = (dx, dz) => cells[z + dz]?.[x + dx] && cells[z + dz][x + dx].kind !== 'wall';
+        if (open(0, -1) || open(0, 1)) g.rotation.y = 0; else g.rotation.y = Math.PI / 2;
+        g.position.set(wx, H, wz);
+        g.userData = { yOpen: H - 1.15, yClosed: H, target: H };
+        board.add(g);
+        if (!parts.gates.has(c.id)) parts.gates.set(c.id, []);
+        parts.gates.get(c.id).push(g);
+      }
+      if (c.lever) {
+        const g = new THREE.Group();
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.1, 0.22), std(0x3a3a3a));
+        base.position.y = 0.05;
+        const pivot = new THREE.Group();
+        pivot.position.y = 0.1;
+        const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.42), metalM);
+        stick.position.y = 0.21;
+        const knob = new THREE.Mesh(new THREE.SphereGeometry(0.06), std(0xd03a3a));
+        knob.position.y = 0.43;
+        pivot.add(stick, knob);
+        pivot.rotation.z = 0.6;
+        pivot.userData.target = 0.6;
+        g.add(base, pivot);
+        g.position.set(wx + 0.28, H, wz - 0.28);
+        g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+        board.add(g);
+        parts.levers.set(c.lever, pivot);
+      }
+      if (c.exit) {
+        const g = new THREE.Group();
+        const postGeo = new THREE.BoxGeometry(0.1, 1.0, 0.1);
+        const l = new THREE.Mesh(postGeo, goldM); l.position.set(-0.4, 0.5, 0);
+        const r = new THREE.Mesh(postGeo, goldM); r.position.set(0.4, 0.5, 0);
+        const top = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.1, 0.12), goldM); top.position.y = 1.0;
+        const glow = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.7, 0.92),
+          new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 0.35, side: THREE.DoubleSide }),
+        );
+        glow.position.y = 0.48;
+        const pad = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.03, 0.7), std(0xffe08a, { emissive: 0xffc040, emissiveIntensity: 0.8 }));
+        pad.position.y = 0.015;
+        g.add(l, r, top, glow, pad);
+        g.traverse((o) => { if (o.isMesh && o !== glow) o.castShadow = true; });
+        // gerbang menghadap petak yang bisa dilewati
+        const nb = [[1, 0], [-1, 0]].some(([dx, dz]) => { const n = cells[z + dz]?.[x + dx]; return n && n.kind !== 'wall' && n.kind !== 'river'; });
+        g.rotation.y = nb ? Math.PI / 2 : 0;
+        g.position.set(wx, H, wz);
+        board.add(g);
+      }
+    }
+  }
+
+  // monster / golem
+  const start = world.def.start;
+  world.def.monsters.forEach((m) => {
+    const actor = stage.monsterKind === 'golem' ? buildGolem() : buildMonster();
+    actor.group.position.set(worldX(m.x), H, worldZ(m.z));
+    actor.group.rotation.y = Math.atan2(start.x - m.x, start.z - m.z);
+    board.add(actor.group);
+    parts.monsters.push(actor);
+  });
+
+  // tema
+  viewport.style.background = `radial-gradient(ellipse at 50% 40%, ${lighten(th.bg, 0.05).getStyle()}, ${th.bg})`;
+  hemi.color.set(lighten(th.light, 0.1));
+  lantern.color.set(th.light);
+  sun.color.set(lighten(th.light, 0.15));
+
+  const s = W + D;
+  fit = { hw: s * 0.38 + 0.4, hh: s * 0.23 + 1.0 };
+  controls.target.set(0, 0.4, 0);
+  camera.position.set(10, 10, 10);
+  camera.zoom = 1;
+  camera.updateProjectionMatrix();
+  resize();
+}
+
+// ------------------------------------------------------------
+//  Aktor
+// ------------------------------------------------------------
+const knight = new THREE.Group(); // posisi & arah di grid
+const knightBody = new THREE.Group(); // animasi kecil (bump, jatuh, dll)
+knight.add(knightBody);
+scene.add(knight);
+const knightMats = [];
+
+function buildKnight() {
+  const g = new THREE.Group();
+  const armor = std(0xb8c2cc, { metalness: 0.55, roughness: 0.4 });
+  knightMats.length = 0;
+  knightMats.push(armor);
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.34, 8, 20), armor);
+  body.position.y = 0.42;
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.228, 0.228, 0.08, 24), std(0x7a1f2b)); // penutup mata (kesatria buta)
+  band.position.y = 0.66;
+  const plume = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.2, 10), std(0xc0392b));
+  plume.position.y = 0.92;
+  const shield = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.26, 0.2), std(0x2f5c8a));
+  shield.position.set(0.24, 0.42, 0.05);
+  g.add(body, band, plume, shield);
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return g;
+}
+
+function buildPrincess() {
+  const g = new THREE.Group();
+  const dress = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.26, 16), std(0xf28ab2));
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.085, 16, 12), std(0xf5d0b5));
+  head.position.y = 0.18;
+  const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.05, 6), std(0xe0b04a, { metalness: 0.6 }));
+  crown.position.y = 0.28;
+  g.add(dress, head, crown);
+  // Sengaja TIDAK memberi bayangan: petunjuk halus plot twist.
+  g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+  g.position.set(...PRINCESS_MODEL.offset);
+  return g;
+}
+
+function buildMonster() {
+  const group = new THREE.Group();
+  const body = new THREE.Group();
+  const skin = std(0x6b5b7a, { roughness: 0.8 });
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.3, 8, 16), skin);
+  torso.position.y = 0.4;
+  const eyeM = std(0x220000, { emissive: 0xff3030, emissiveIntensity: 2 });
+  const e1 = new THREE.Mesh(new THREE.SphereGeometry(0.04), eyeM); e1.position.set(-0.08, 0.55, 0.19);
+  const e2 = e1.clone(); e2.position.x = 0.08;
+  const horn = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.16, 8), std(0xd9d2c0));
+  horn.position.set(0, 0.8, 0);
+  body.add(torso, e1, e2, horn);
+  body.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return finishActor(group, body, eyeM, 1.05);
+}
+
+function buildGolem() {
+  const group = new THREE.Group();
+  const body = new THREE.Group();
+  const stone = std(0x7d7a72, { roughness: 1 });
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.55, 0.46), stone); torso.position.y = 0.45;
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.28, 0.32), stone); head.position.y = 0.88;
+  const armGeo = new THREE.BoxGeometry(0.16, 0.5, 0.18);
+  const a1 = new THREE.Mesh(armGeo, stone); a1.position.set(-0.42, 0.4, 0);
+  const a2 = a1.clone(); a2.position.x = 0.42;
+  const eyeM = std(0x001020, { emissive: 0x40c0ff, emissiveIntensity: 2.2 });
+  const eye = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.05, 0.02), eyeM); eye.position.set(0, 0.9, 0.17);
+  body.add(torso, head, a1, a2, eye);
+  body.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return finishActor(group, body, eyeM, 1.3);
+}
+
+function finishActor(group, body, eyeM, zzY) {
+  const zz = new THREE.Sprite(new THREE.SpriteMaterial({ map: getZzTexture(), transparent: true, depthWrite: false }));
+  zz.scale.set(0.5, 0.25, 1);
+  zz.position.y = zzY;
+  group.add(body, zz);
+  return { group, body, eyeM, zz, k: 0, target: 0, lunge: 0 };
+}
+
+// File model dimuat sekali lalu di-clone (aman untuk model ber-skeleton).
+const modelCache = new Map();
+function loadRaw(url) {
+  if (!modelCache.has(url)) {
+    const isFbx = /\.fbx$/i.test(url);
+    const p = (isFbx ? new FBXLoader() : new GLTFLoader()).loadAsync(url)
+      .then((r) => (isFbx ? { scene: r, animations: r.animations } : { scene: r.scene, animations: r.animations }));
+    p.catch(() => modelCache.delete(url));
+    modelCache.set(url, p);
+  }
+  return modelCache.get(url);
+}
+
+// Buang perpindahan posisi Hips (root motion) di sumbu X/Z agar karakter tetap di petaknya.
+function stripRootMotion(clip) {
+  if (clip.userData?.stripped) return clip;
+  for (const t of clip.tracks) {
+    if (!/Hips\.position$/i.test(t.name)) continue;
+    const v = t.values;
+    for (let i = 0; i < v.length; i += 3) { v[i] = v[0]; v[i + 2] = v[2]; }
+  }
+  clip.userData = { ...clip.userData, stripped: true };
+  return clip;
+}
+
+async function loadModel(cfg) {
+  const raw = await loadRaw(cfg.url);
+  const model = cloneSkinned(raw.scene);
+  model.traverse((o) => {
+    if (!o.isMesh) return;
+    o.castShadow = true;
+    o.receiveShadow = true;
+    if (o.isSkinnedMesh) o.frustumCulled = false;
+    for (const m of [].concat(o.material)) if (m.map) m.map.colorSpace = THREE.SRGBColorSpace;
+  });
+  model.rotation.y = cfg.rotationY ?? 0;
+
+  // Skala otomatis dari tinggi model (Mixamo memakai satuan cm).
+  const measure = () => {
+    model.updateMatrixWorld(true);
+    model.traverse((o) => { if (o.isSkinnedMesh) { o.skeleton.update(); o.computeBoundingBox(); } });
+    return new THREE.Box3().setFromObject(model);
+  };
+  let box = measure();
+  const h = box.max.y - box.min.y;
+  const s = cfg.scale ?? (h > 0 && Number.isFinite(h) ? (cfg.height ?? 1) / h : 0.01);
+  model.scale.multiplyScalar(s);
+  box = measure();
+  const c = box.getCenter(new THREE.Vector3());
+  model.position.x -= c.x;
+  model.position.z -= c.z;
+  model.position.y += -box.min.y + (cfg.yOffset ?? 0);
+
+  const wrap = new THREE.Group();
+  wrap.add(model);
+  return { wrap, model, animations: raw.animations };
+}
+
+let mixer = null;
+let walkAction = null;
+let walkRate = 0; // 0 = diam, >0 = kecepatan animasi jalan
+let idleAction = null;
+let walkW = 0; // bobot campuran jalan (0 = idle penuh, 1 = jalan penuh)
+let princessObj = buildPrincess();
+function setKnightObject(obj) {
+  knightBody.clear();
+  knightBody.add(obj, princessObj);
+}
+setKnightObject(buildKnight());
+
+async function applyCustomModels() {
+  try {
+    if (KNIGHT_MODEL.url) {
+      const { wrap, model, animations } = await loadModel(KNIGHT_MODEL);
+      knightMats.length = 0;
+      model.traverse((o) => {
+        if (o.isMesh) for (const m of [].concat(o.material)) if (m.emissive) knightMats.push(m);
+      });
+      setKnightObject(wrap);
+      mixer = null; walkAction = null; idleAction = null; walkW = 0;
+      const clip = typeof KNIGHT_MODEL.walkClip === 'string'
+        ? animations.find((a) => a.name === KNIGHT_MODEL.walkClip)
+        : animations[KNIGHT_MODEL.walkClip ?? 0];
+      if (clip) {
+        mixer = new THREE.AnimationMixer(model);
+        walkAction = mixer.clipAction(stripRootMotion(clip));
+        walkAction.play();
+      }
+      if (KNIGHT_MODEL.idleUrl) {
+        try {
+          const idleClip = (await loadRaw(KNIGHT_MODEL.idleUrl)).animations[0];
+          if (idleClip) {
+            mixer ??= new THREE.AnimationMixer(model);
+            idleAction = mixer.clipAction(stripRootMotion(idleClip));
+            idleAction.play();
+            walkAction?.setEffectiveWeight(0);
+          }
+        } catch (e) { console.error('Gagal memuat animasi idle:', e); }
+      }
+      mixer?.update(0);
+    }
+    if (PRINCESS_MODEL.url) {
+      const { wrap } = await loadModel(PRINCESS_MODEL);
+      wrap.traverse((o) => { if (o.isMesh) o.castShadow = false; });
+      wrap.position.set(...PRINCESS_MODEL.offset);
+      knightBody.remove(princessObj);
+      princessObj = wrap;
+      knightBody.add(princessObj);
+    }
+  } catch (e) {
+    console.error('Gagal memuat model:', e);
+    showToast('Model 3D gagal dimuat, memakai kapsul');
+  }
+}
+applyCustomModels();
+// Dari console: setKnightModel({ url: 'models/knight.glb', scale: 0.5 })
+window.setKnightModel = async (cfg) => { Object.assign(KNIGHT_MODEL, cfg); await applyCustomModels(); };
+
+// Monster/golem custom: dipasang ulang tiap board dibangun.
+async function applyMonsterModels() {
+  const cfg = stage.monsterKind === 'golem' ? GOLEM_MODEL : MONSTER_MODEL;
+  if (!cfg.url) return;
+  try {
+    for (const a of parts.monsters) {
+      const { wrap } = await loadModel(cfg);
+      const keep = a.body.children.filter((c) => c.material === a.eyeM);
+      a.body.clear();
+      a.body.add(wrap, ...keep.map((k) => { k.visible = false; return k; }));
+    }
+  } catch (e) { console.error('Gagal memuat model monster:', e); }
+}
+
+// ------------------------------------------------------------
+//  Sinkron tampilan dengan World
+// ------------------------------------------------------------
+let knightAngle = 0;
+function placeKnight() {
+  const { x, z } = world;
+  knight.position.set(worldX(x), H, worldZ(z));
+  knightAngle = angleFor(world.dir);
+  knight.rotation.y = knightAngle;
+  knightBody.position.set(0, 0, 0);
+  knightBody.rotation.set(0, 0, 0);
+  knightBody.scale.set(1, 1, 1);
+  knight.visible = true;
+  setKnightFlash(0);
+}
+
+function syncWorld(instant = false) {
+  world.monsters.forEach((m, i) => {
+    const a = parts.monsters[i];
+    if (!a) return;
+    a.target = world.asleep(m) ? 1 : 0;
+    if (instant) a.k = a.target;
+  });
+  for (const [id, list] of parts.bridges) for (const p of list) {
+    p.userData.target = world.active.has(id) ? p.userData.yOpen : p.userData.yClosed;
+    if (instant) p.position.y = p.userData.target;
+  }
+  for (const [id, list] of parts.gates) for (const g of list) {
+    g.userData.target = world.active.has(id) ? g.userData.yOpen : g.userData.yClosed;
+    if (instant) g.position.y = g.userData.target;
+  }
+  for (const [id, pivot] of parts.levers) {
+    pivot.userData.target = world.active.has(id) ? -0.6 : 0.6;
+    if (instant) pivot.rotation.z = pivot.userData.target;
+  }
+}
+
+function setKnightFlash(v) {
+  for (const m of knightMats) { m.emissive.setRGB(v, 0, 0); }
+}
+
+function resetVisual() {
+  placeKnight();
+  syncWorld(true);
+  for (const g of parts.spikes.values()) g.scale.set(1, 1, 1);
+}
+
+// ------------------------------------------------------------
+//  Loop render
+// ------------------------------------------------------------
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+  const f = Math.min(1, dt * 7);
+  if (mixer) {
+    if (idleAction) {
+      // campur halus idle <-> jalan
+      walkW += ((walkRate > 0 ? 1 : 0) - walkW) * Math.min(1, dt * 12);
+      idleAction.setEffectiveWeight(1 - walkW);
+      if (walkAction) {
+        walkAction.setEffectiveWeight(walkW);
+        if (walkRate > 0) walkAction.setEffectiveTimeScale(walkRate);
+      }
+      mixer.update(dt);
+    } else if (walkRate > 0) mixer.update(dt * walkRate);
+  }
+  for (const a of parts.monsters) {
+    a.k += (a.target - a.k) * f;
+    a.body.rotation.z = a.k * 1.35;
+    a.body.position.y = -a.k * 0.12 + (1 - a.k) * Math.abs(Math.sin(t * 3)) * 0.03;
+    a.body.position.z = a.lunge;
+    a.eyeM.emissiveIntensity = (1 - a.k) * 2.2;
+    a.zz.visible = a.k > 0.6;
+    a.zz.position.x = Math.sin(t * 2) * 0.05;
+    a.zz.material.opacity = 0.6 + Math.sin(t * 3) * 0.3;
+  }
+  board.children.forEach((o) => {
+    if (o.userData.target !== undefined) o.position.y += (o.userData.target - o.position.y) * f;
+    if (o.userData.water) o.position.y = 0.28 + Math.sin(t * 2 + o.position.x + o.position.z) * 0.015;
+  });
+  for (const p of parts.levers.values()) p.rotation.z += (p.userData.target - p.rotation.z) * f;
+  lantern.position.set(knight.position.x, knight.position.y + 1.1, knight.position.z);
+  controls.update();
+  renderer.render(scene, camera);
+});
+
+// ------------------------------------------------------------
+//  Animasi aksi kesatria
+// ------------------------------------------------------------
+let runToken = 0;
+const SPEEDS = [0.5, 1, 1.7, 2.8, 5];
+const speedEl = document.getElementById('speed');
+const dur = (ms) => ms / SPEEDS[+speedEl.value - 1];
+const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+const lerp = (a, b, t) => a + (b - a) * t;
+
+function tween(ms, fn, token) {
+  return new Promise((resolve) => {
+    const t0 = performance.now();
+    const step = (now) => {
+      if (token !== runToken) return resolve(false);
+      const t = Math.min(1, (now - t0) / ms);
+      fn(t);
+      if (t < 1) requestAnimationFrame(step); else resolve(true);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+async function travel(ev, token) {
+  const from = knight.position.clone();
+  const to = new THREE.Vector3(worldX(ev.to.x), H, worldZ(ev.to.z));
+  const jump = ev.type === 'jump';
+  const arc = jump ? 0.7 : 0;
+  const ms = dur(jump ? 560 : 420);
+  // satu petak = setengah siklus jalan (satu langkah kaki)
+  if (walkAction) walkRate = (walkAction.getClip().duration * 0.5) / (ms / 1000);
+  await tween(ms, (t) => {
+    const e = ease(t);
+    knight.position.set(lerp(from.x, to.x, e), lerp(from.y, to.y, e) + Math.sin(Math.PI * t) * arc, lerp(from.z, to.z, e));
+    if (!jump && !walkAction) knightBody.position.y = Math.abs(Math.sin(Math.PI * 2 * t)) * 0.05;
+  }, token);
+  walkRate = 0;
+  knightBody.position.y = 0;
+}
+
+async function bump(token) {
+  await tween(dur(360), (t) => {
+    knightBody.position.z = Math.sin(Math.PI * t) * 0.15;
+    knightBody.rotation.z = Math.sin(Math.PI * 4 * t) * 0.08 * (1 - t);
+  }, token);
+  knightBody.position.z = 0; knightBody.rotation.z = 0;
+}
+
+async function animateEvent(ev, token) {
+  switch (ev.result) {
+    case 'turn': {
+      sfx('turn');
+      const from = knightAngle, to = from - ev.delta * (Math.PI / 2);
+      await tween(dur(300), (t) => { knight.rotation.y = lerp(from, to, ease(t)); }, token);
+      knightAngle = to;
+      break;
+    }
+    case 'move':
+      sfx(ev.type === 'jump' ? 'jump' : 'step');
+      await travel(ev, token);
+      break;
+    case 'bump':
+      sfx('bump');
+      await bump(token);
+      break;
+    case 'wait':
+      sfx('wait');
+      await tween(dur(420), (t) => { knightBody.scale.y = 1 - Math.sin(Math.PI * 2 * t) * 0.04; }, token);
+      knightBody.scale.y = 1;
+      break;
+    case 'lever':
+      sfx('lever');
+      syncWorld();
+      await tween(dur(420), (t) => { knightBody.scale.y = 1 - Math.sin(Math.PI * t) * 0.12; }, token);
+      knightBody.scale.y = 1;
+      break;
+    case 'nolever':
+      showToast('Tidak ada tuas di petak ini');
+      sfx('bump');
+      await bump(token);
+      break;
+    case 'fall':
+      sfx(ev.type === 'jump' ? 'jump' : 'step');
+      await travel(ev, token);
+      sfx('fall');
+      await tween(dur(600), (t) => {
+        knight.position.y = H - t * t * 2.6;
+        knightBody.rotation.x = t * 0.8;
+      }, token);
+      knight.visible = false;
+      break;
+    case 'trap': {
+      await travel(ev, token);
+      sfx('trap');
+      const sp = parts.spikes.get(key(ev.to.x, ev.to.z));
+      await tween(dur(420), (t) => {
+        if (sp) sp.scale.y = 1 + Math.sin(Math.PI * Math.min(1, t * 2)) * 0.9;
+        setKnightFlash(Math.sin(Math.PI * t) * 0.8);
+        knightBody.rotation.x = -t * 1.2;
+      }, token);
+      break;
+    }
+    case 'caught': {
+      await travel(ev, token);
+      sfx('caught');
+      const a = parts.monsters[ev.monster];
+      await tween(dur(480), (t) => {
+        if (a) a.lunge = Math.sin(Math.PI * t) * 0.25;
+        setKnightFlash(Math.sin(Math.PI * t) * 0.8);
+        knightBody.rotation.x = -t * 1.3;
+      }, token);
+      if (a) a.lunge = 0;
+      break;
+    }
+  }
+}
+
+// ------------------------------------------------------------
+//  Suara: SFX + musik prosedural per stage
+// ------------------------------------------------------------
+let muted = false;
+let actx = null;
+const audio = () => (actx ??= new (window.AudioContext || window.webkitAudioContext)());
+const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
+
+function tone(freq, len, type = 'square', vol = 0.05, when = 0) {
+  const ctx = audio();
+  const t = ctx.currentTime + when;
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = type;
+  o.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+  o.connect(g).connect(ctx.destination);
+  o.start(t); o.stop(t + len + 0.02);
+}
+
+function sfx(kind) {
+  if (muted) return;
+  try {
+    const P = {
+      step: [[330, 0.06]], turn: [[440, 0.05]], jump: [[300, 0.06], [560, 0.09]],
+      wait: [[260, 0.05], [260, 0.05]], lever: [[180, 0.05, 'sawtooth'], [520, 0.08], [700, 0.1]],
+      bump: [[120, 0.12, 'sawtooth']], fall: [[500, 0.1, 'triangle'], [350, 0.12, 'triangle'], [200, 0.2, 'triangle']],
+      trap: [[90, 0.18, 'sawtooth'], [70, 0.2, 'sawtooth']], caught: [[150, 0.12, 'sawtooth'], [110, 0.25, 'sawtooth']],
+      win: [[523, 0.1], [659, 0.1], [784, 0.1], [1046, 0.25]], fail: [[300, 0.12], [200, 0.2]],
+      click: [[600, 0.03]], eval: [[880, 0.04, 'sine']],
+    };
+    let w = 0;
+    for (const [f, d, type] of P[kind] || []) { tone(f, d, type || 'square', 0.045, w); w += d * 0.9; }
+  } catch { /* audio tidak tersedia */ }
+}
+
+let musicTimer = null;
+function startMusic() {
+  stopMusic();
+  if (muted || !actx) return;
+  const m = stage.theme.music;
+  const beat = 60 / m.tempo / 2;
+  let i = 0;
+  musicTimer = setInterval(() => {
+    try {
+      const n = m.notes[i % m.notes.length];
+      if (i % 16 === 0) tone(midi(m.root - 12), beat * 15, 'sine', 0.02);
+      if (n != null) tone(midi(m.root + n), beat * 1.8, 'triangle', 0.018);
+      i++;
+    } catch { stopMusic(); }
+  }, beat * 1000);
+}
+function stopMusic() { clearInterval(musicTimer); musicTimer = null; }
+
+const muteIcon = document.getElementById('muteIcon');
+function renderMute() {
+  muteIcon.innerHTML = muted
+    ? '<path d="M11 5 6 9H2v6h4l5 4z"/><path d="m22 9-6 6M16 9l6 6"/>'
+    : '<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>';
+}
+document.getElementById('btnMute').onclick = () => {
+  muted = !muted;
+  store('muted', muted);
+  renderMute();
+  if (muted) stopMusic(); else { audio(); startMusic(); }
+};
+
+// ------------------------------------------------------------
+//  Penyimpanan
+// ------------------------------------------------------------
+function store(k, v) { try { localStorage.setItem('kesatria.' + k, JSON.stringify(v)); } catch {} }
+function load(k, d) { try { const v = localStorage.getItem('kesatria.' + k); return v === null ? d : JSON.parse(v); } catch { return d; } }
+const progress = () => ({ unlocked: 1, stars: {}, ...load('progress', {}) });
+
+// ------------------------------------------------------------
+//  Editor blok
+// ------------------------------------------------------------
+const ICONS = {
+  move: '<path d="M12 19V5M5 12l7-7 7 7"/>',
+  right: '<path d="M4 20v-7a4 4 0 0 1 4-4h12"/><path d="m15 4 5 5-5 5"/>',
+  left: '<path d="M20 20v-7a4 4 0 0 0-4-4H4"/><path d="m9 4-5 5 5 5"/>',
+  jump: '<path d="M4 16a8 8 0 0 1 16 0"/><path d="m16 13 4 3 3-4"/>',
+  repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+  if: '<path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
+  lever: '<path d="M5 20h14"/><path d="M12 20 17 6"/><circle cx="17.5" cy="5" r="2"/>',
+  wait: '<path d="M6 2h12M6 22h12M7 2c0 6 10 6 10 10S7 16 7 22M17 2c0 6-10 6-10 10s10 4 10 10"/>',
+  call: '<path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1"/><path d="M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/>',
+};
+const BLOCKS = {
+  move: { label: 'Maju', cat: 'move' },
+  left: { label: 'Belok Kiri', cat: 'move' },
+  right: { label: 'Belok Kanan', cat: 'move' },
+  jump: { label: 'Lompat', cat: 'move' },
+  repeat: { label: 'Ulangi', cat: 'ctrl' },
+  if: { label: 'Jika', cat: 'cond' },
+  lever: { label: 'Tarik Tuas', cat: 'act' },
+  wait: { label: 'Tunggu', cat: 'act' },
+  call: { label: 'Panggil Fungsi', cat: 'fn' },
+};
+const svg = (t) => `<svg viewBox="0 0 24 24">${ICONS[t]}</svg>`;
+const catVar = (t) => `var(--c-${BLOCKS[t].cat})`;
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+let program = [];
+let fnBody = [];
+let fnName = 'Fungsi';
+let activeList = 'main';
+let running = false;
+let drag = null; // { kind: 'new', type } | { kind: 'move', id }
+
+const programEl = document.getElementById('program');
+const paletteEl = document.getElementById('palette');
+const hasFn = () => stage.blocks.includes('call');
+
+function newNode(type) {
+  if (type === 'repeat') return { id: newId(), type, count: 2, body: [] };
+  if (type === 'if') return { id: newId(), type, cond: 'monster', then: [], else: [] };
+  return { id: newId(), type };
+}
+
+function findNode(id, lists = [program, fnBody]) {
+  for (const list of lists) {
+    for (let i = 0; i < list.length; i++) {
+      const n = list[i];
+      if (n.id === id) return { node: n, list, index: i };
+      const r = findNode(id, childLists(n));
+      if (r) return r;
+    }
+  }
+  return null;
+}
+function getList(listId) {
+  if (listId === 'main') return program;
+  if (listId === 'fn') return fnBody;
+  const [id, part] = listId.split(':');
+  const f = findNode(+id);
+  if (!f) return program;
+  return part ? f.node[part] : f.node.body;
+}
+const ownerOf = (listId) => (listId === 'main' || listId === 'fn' ? null : +listId.split(':')[0]);
+function containsList(node, listId) {
+  const owner = ownerOf(listId);
+  if (owner == null) return false;
+  if (node.id === owner) return true;
+  return childLists(node).some((l) => l.some((c) => containsList(c, listId)));
+}
+const totalBlocks = () => countBlocks(program) + (hasFn() ? countBlocks(fnBody) : 0);
+function canAdd() {
+  if (stage.limit && totalBlocks() >= stage.limit) {
+    showToast(`Batas ${stage.limit} blok tercapai. Coba pakai ${stage.blocks.includes('call') ? 'Fungsi' : 'Ulangi'}!`);
+    sfx('bump');
+    return false;
+  }
+  return true;
+}
+
+function addInstruction(type) {
+  if (running || !canAdd()) return;
+  const n = newNode(type);
+  getList(activeList).push(n);
+  if (type === 'repeat') activeList = String(n.id);
+  if (type === 'if') activeList = `${n.id}:then`;
+  sfx('click');
+  changed();
+}
+
+function deleteNode(id) {
+  const f = findNode(id);
+  if (!f) return;
+  if (containsList(f.node, activeList)) activeList = 'main';
+  f.list.splice(f.index, 1);
+  changed();
+}
+
+function changed() {
+  saveProgram();
+  renderProgram();
+  updateHud();
+}
+
+function renderPalette() {
+  paletteEl.innerHTML = '';
+  const prev = LEVELS[LEVELS.indexOf(stage) - 1];
+  for (const type of stage.blocks) {
+    const b = document.createElement('button');
+    b.className = 'pal-btn' + (prev && !prev.blocks.includes(type) ? ' new' : '');
+    b.style.setProperty('--cat', catVar(type));
+    b.draggable = true;
+    b.innerHTML = `${svg(type)}<span>${BLOCKS[type].label}</span>`;
+    b.title = prev && !prev.blocks.includes(type) ? 'Blok baru!' : BLOCKS[type].label;
+    b.onclick = () => addInstruction(type);
+    b.addEventListener('dragstart', (e) => {
+      if (running) return e.preventDefault();
+      drag = { kind: 'new', type };
+      e.dataTransfer.effectAllowed = 'copyMove';
+      e.dataTransfer.setData('text/plain', type);
+    });
+    b.addEventListener('dragend', endDrag);
+    paletteEl.appendChild(b);
+  }
+}
+
+function renderProgram() {
+  const scroll = programEl.scrollTop;
+  programEl.innerHTML = '';
+  const main = document.createElement('div');
+  main.className = 'main-wrap';
+  if (hasFn()) main.innerHTML = '<div class="list-label">Program utama</div>';
+  main.appendChild(renderList(program, 'main'));
+  programEl.appendChild(main);
+
+  if (hasFn()) {
+    const fw = document.createElement('div');
+    fw.className = 'fn-wrap';
+    fw.innerHTML = `<div class="list-label">${svg('call')} Fungsi <input id="fnNameInput" maxlength="20" value="${esc(fnName)}" title="Nama fungsi"></div>`;
+    const input = fw.querySelector('input');
+    input.addEventListener('change', () => { fnName = input.value.trim() || 'Fungsi'; changed(); });
+    fw.appendChild(renderList(fnBody, 'fn'));
+    programEl.appendChild(fw);
+  }
+  programEl.scrollTop = scroll;
+}
+
+function renderList(list, listId) {
+  const el = document.createElement('div');
+  el.className = 'plist';
+  el.dataset.list = listId;
+  if (listId === activeList) el.classList.add('active');
+  if (!list.length) {
+    const e = document.createElement('div');
+    e.className = 'empty';
+    e.textContent = listId === 'main' ? 'Letakkan blok di sini'
+      : listId === 'fn' ? 'Klik di sini, lalu isi fungsi' : 'Klik di sini, lalu tambah blok';
+    el.appendChild(e);
+  }
+  list.forEach((n, i) => el.appendChild(renderNode(n, i)));
+
+  el.addEventListener('click', (e) => {
+    if (e.target.closest('.plist') !== el) return;
+    if (e.target.closest('.pitem')?.parentElement === el) return;
+    activeList = listId;
+    renderProgram();
+  });
+  el.addEventListener('dragover', (e) => {
+    if (!drag) return;
+    e.stopPropagation();
+    if (drag.kind === 'move') {
+      const f = findNode(drag.id);
+      if (f && containsList(f.node, listId)) return; // tidak boleh masuk ke dirinya sendiri
+    }
+    e.preventDefault();
+    e.dataTransfer.dropEffect = drag.kind === 'new' ? 'copy' : 'move';
+    showDropLine(el, dropIndex(el, e.clientY));
+  });
+  el.addEventListener('drop', (e) => {
+    if (!drag) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const idx = dropIndex(el, e.clientY);
+    const target = getList(listId);
+    if (drag.kind === 'new') {
+      if (canAdd()) {
+        const n = newNode(drag.type);
+        target.splice(idx, 0, n);
+        if (n.type === 'repeat') activeList = String(n.id);
+        if (n.type === 'if') activeList = `${n.id}:then`;
+      }
+    } else {
+      const f = findNode(drag.id);
+      if (f) {
+        let i = idx;
+        if (f.list === target && f.index < idx) i--;
+        f.list.splice(f.index, 1);
+        target.splice(i, 0, f.node);
+      }
+    }
+    endDrag();
+    changed();
+  });
+  return el;
+}
+
+function renderNode(n, i) {
+  const el = document.createElement('div');
+  el.className = 'pitem';
+  el.dataset.id = n.id;
+  el.draggable = true;
+  el.style.setProperty('--cat', catVar(n.type));
+  const del = '<button class="del" title="Hapus">×</button>';
+  const num = `<span class="num">${i + 1}</span>`;
+
+  if (n.type === 'repeat') {
+    el.classList.add('box');
+    el.innerHTML = `<div class="rhead">${num}${svg('repeat')}<span>Ulangi</span>
+      <input type="number" min="1" max="20" value="${n.count}" title="jumlah ulang"><span class="lbl">kali</span>${del}</div>`;
+    const input = el.querySelector('input');
+    input.addEventListener('change', () => {
+      n.count = Math.max(1, Math.min(20, Math.round(+input.value) || 1));
+      input.value = n.count;
+      saveProgram();
+    });
+    const body = renderList(n.body, String(n.id));
+    body.classList.add('rbody');
+    el.appendChild(body);
+  } else if (n.type === 'if') {
+    el.classList.add('box');
+    const opts = Object.entries(CONDITIONS)
+      .map(([k, v]) => `<option value="${k}" ${k === n.cond ? 'selected' : ''}>${v}</option>`).join('');
+    el.innerHTML = `<div class="rhead">${num}${svg('if')}<span>Jika</span><select title="kondisi">${opts}</select><span>maka</span>${del}</div>`;
+    const sel = el.querySelector('select');
+    sel.addEventListener('change', () => { n.cond = sel.value; saveProgram(); });
+    const thenEl = renderList(n.then, `${n.id}:then`);
+    thenEl.classList.add('rbody');
+    const elseLbl = document.createElement('div');
+    elseLbl.className = 'else-label';
+    elseLbl.textContent = 'lainnya';
+    const elseEl = renderList(n.else, `${n.id}:else`);
+    elseEl.classList.add('rbody');
+    el.append(thenEl, elseLbl, elseEl);
+  } else if (n.type === 'call') {
+    el.innerHTML = `${num}${svg('call')}<span class="lbl">Panggil <b>${esc(fnName)}</b></span>${del}`;
+  } else {
+    el.innerHTML = `${num}${svg(n.type)}<span class="lbl">${BLOCKS[n.type].label}</span>${del}`;
+  }
+  for (const inp of el.querySelectorAll(':scope > .rhead input, :scope > .rhead select')) {
+    inp.addEventListener('mousedown', (e) => e.stopPropagation());
+    inp.addEventListener('click', (e) => e.stopPropagation());
+  }
+  el.querySelector('.del').addEventListener('click', (e) => { e.stopPropagation(); if (!running) deleteNode(n.id); });
+  el.addEventListener('dragstart', (e) => {
+    e.stopPropagation();
+    if (running || ['INPUT', 'SELECT'].includes(document.activeElement?.tagName) && el.contains(document.activeElement)) return e.preventDefault();
+    drag = { kind: 'move', id: n.id };
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(n.id));
+    requestAnimationFrame(() => el.classList.add('dragging'));
+  });
+  el.addEventListener('dragend', endDrag);
+  return el;
+}
+
+let dropLine = null;
+function dropIndex(listEl, y) {
+  const items = [...listEl.children].filter((c) => c.classList.contains('pitem'));
+  for (let i = 0; i < items.length; i++) {
+    const r = items[i].getBoundingClientRect();
+    if (y < r.top + r.height / 2) return i;
+  }
+  return items.length;
+}
+function showDropLine(listEl, idx) {
+  dropLine ??= Object.assign(document.createElement('div'), { className: 'drop-line' });
+  const items = [...listEl.children].filter((c) => c.classList.contains('pitem'));
+  listEl.insertBefore(dropLine, items[idx] || null);
+}
+function endDrag() {
+  drag = null;
+  dropLine?.remove();
+  document.querySelectorAll('.pitem.dragging').forEach((e) => e.classList.remove('dragging'));
+}
+// seret blok keluar area program = hapus
+document.addEventListener('dragover', (e) => { if (drag?.kind === 'move') { e.preventDefault(); dropLine?.remove(); } });
+document.addEventListener('drop', (e) => {
+  if (drag?.kind === 'move' && !programEl.contains(e.target)) { e.preventDefault(); deleteNode(drag.id); }
+  endDrag();
+});
+
+const maxId = (list) => list.reduce((m, n) => Math.max(m, n.id, ...childLists(n).map(maxId)), 0);
+function saveProgram() { store('prog.' + stage.id, { program, fnBody, fnName }); }
+function loadProgram() {
+  const saved = load('prog.' + stage.id, null);
+  if (saved) {
+    program = saved.program || [];
+    fnBody = saved.fnBody || [];
+    fnName = saved.fnName || stage.fnName || 'Fungsi';
+  } else {
+    program = stage.initialProgram ? fromCompact(stage.initialProgram) : [];
+    fnBody = [];
+    fnName = stage.fnName || 'Fungsi';
+  }
+  bumpId(Math.max(maxId(program), maxId(fnBody)));
+  activeList = 'main';
+}
+
+document.getElementById('btnClear').onclick = () => {
+  if (running) return;
+  program = stage.initialProgram ? fromCompact(stage.initialProgram) : [];
+  fnBody = [];
+  activeList = 'main';
+  changed();
+};
+
+// ------------------------------------------------------------
+//  HUD: timer, bintang, jumlah blok
+// ------------------------------------------------------------
+const timerEl = document.getElementById('timer');
+const starGoalEl = document.getElementById('starGoal');
+const blockEl = document.getElementById('blockCount');
+let elapsed = 0;
+let stageDone = false;
+let blockingUI = 0; // >0 saat cutscene/dialog pembuka tampil
+let timeUpWarned = false;
+const fmt = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const starsFor = (t) => (t < stage.stars[0] ? 3 : t < stage.stars[1] ? 2 : t < stage.stars[2] ? 1 : 0);
+
+function updateHud() {
+  const left = stage.time - elapsed;
+  timerEl.textContent = left > 0 ? `⏱ ${fmt(left)}` : '⏱ Waktu habis';
+  timerEl.className = 'chip' + (left <= 0 ? ' over' : left < 20 ? ' warn' : '');
+  const s = starsFor(elapsed);
+  const nextDrop = s > 0 ? stage.stars[3 - s] - elapsed : 0;
+  starGoalEl.innerHTML = s > 0
+    ? `${'★'.repeat(s)}${'☆'.repeat(3 - s)} <span class="dim">sisa ${fmt(nextDrop)}</span>`
+    : '☆☆☆ <span class="dim">tanpa bintang</span>';
+  const n = totalBlocks();
+  blockEl.textContent = stage.limit ? `Blok ${n}/${stage.limit}` : `Blok ${n}`;
+  blockEl.className = 'chip' + (stage.limit && n >= stage.limit ? ' warn' : '');
+}
+
+let lastTick = performance.now();
+setInterval(() => {
+  const now = performance.now();
+  const dt = (now - lastTick) / 1000;
+  lastTick = now;
+  const active = !running && !stageDone && blockingUI === 0 && document.getElementById('titleOverlay').hidden && document.visibilityState === 'visible';
+  if (!active) return;
+  elapsed += dt;
+  if (elapsed >= stage.time && !timeUpWarned) {
+    timeUpWarned = true;
+    sfx('fail');
+    showToast('Waktu habis! Kamu tetap bisa menyelesaikan stage, tapi tanpa bintang.');
+  }
+  updateHud();
+}, 200);
+
+// ------------------------------------------------------------
+//  Menjalankan program
+// ------------------------------------------------------------
+const runBtn = document.getElementById('btnRun');
+let failCount = 0;
+
+function highlight(id) {
+  programEl.querySelectorAll('.pitem.running').forEach((e) => e.classList.remove('running'));
+  if (id == null) return;
+  const el = programEl.querySelector(`.pitem[data-id="${id}"]`);
+  if (el) { el.classList.add('running'); el.scrollIntoView({ block: 'nearest' }); }
+}
+function flashEval(id, result) {
+  const el = programEl.querySelector(`.pitem[data-id="${id}"]`);
+  if (!el) return;
+  el.classList.remove('eval-true', 'eval-false');
+  el.classList.add(result ? 'eval-true' : 'eval-false');
+  el.scrollIntoView({ block: 'nearest' });
+  setTimeout(() => el.classList.remove('eval-true', 'eval-false'), 700);
+}
+
+function setRunning(v) {
+  running = v;
+  runBtn.disabled = v;
+  programEl.style.pointerEvents = v ? 'none' : '';
+}
+
+async function run() {
+  if (running || stageDone) return;
+  if (!program.length) return showToast('Tambahkan blok dulu');
+  closeDialog();
+  const token = ++runToken;
+  world.reset();
+  resetVisual();
+  setRunning(true);
+  let reason = null;
+  try {
+    for (const y of interpret(program, fnBody, world)) {
+      if (token !== runToken) return;
+      if (y.kind === 'eval') {
+        highlight(y.node.id);
+        flashEval(y.node.id, y.result);
+        sfx('eval');
+        await tween(dur(280), () => {}, token);
+        continue;
+      }
+      if (y.kind === 'call') {
+        highlight(y.node.id);
+        await tween(dur(200), () => {}, token);
+        continue;
+      }
+      highlight(y.node.id);
+      const ev = world.step(y.node.type);
+      await animateEvent(ev, token);
+      if (token !== runToken) return;
+      syncWorld();
+      if (ev.result === 'fall') reason = ev.river ? 'river' : 'fall';
+      else if (ev.result === 'trap' || ev.result === 'caught') reason = ev.result;
+      await tween(dur(80), () => {}, token);
+    }
+  } catch (e) {
+    if (!(e instanceof LimitError)) throw e;
+    reason = e.kind;
+  }
+  if (token !== runToken) return;
+  highlight(null);
+  setRunning(false);
+  if (world.status === 'won') onWin();
+  else onFail(reason || 'incomplete');
+}
+
+function onFail(reason) {
+  sfx('fail');
+  failCount++;
+  const hint = HINTS[stage.id][Math.min(failCount, 3) - 1];
+  say([['princess', FAIL_LINES[reason]], ['princess', hint]]);
+}
+
+function onWin() {
+  stageDone = true;
+  sfx('win');
+  const s = starsFor(elapsed);
+  const p = progress();
+  p.stars[stage.id] = Math.max(p.stars[stage.id] || 0, s);
+  p.unlocked = Math.max(p.unlocked, Math.min(LEVELS.length, stage.id + 1));
+  store('progress', p);
+  document.getElementById('winStars').innerHTML =
+    `${'★'.repeat(s)}<span class="off">${'★'.repeat(3 - s)}</span>`;
+  document.getElementById('winText').textContent =
+    `Waktu menyusun ${fmt(elapsed)} · ${totalBlocks()} blok. "${WIN_LINES[stage.id]}"`;
+  document.getElementById('winEng').innerHTML =
+    `<b>Konsep:</b> ${stage.concept}<br><b>Engineering:</b> ${stage.engineering}`;
+  document.getElementById('btnNext').textContent = stage.id === LEVELS.length ? 'Epilog ›' : 'Stage berikutnya ›';
+  setTimeout(() => { document.getElementById('winOverlay').hidden = false; }, 500);
+}
+
+function stop() {
+  runToken++;
+  highlight(null);
+  setRunning(false);
+  world.reset();
+  resetVisual();
+}
+
+runBtn.onclick = run;
+document.getElementById('btnReset').onclick = stop;
+speedEl.value = load('speed', 2);
+speedEl.oninput = () => store('speed', +speedEl.value);
+
+// ------------------------------------------------------------
+//  Dialog putri, toast, cutscene
+// ------------------------------------------------------------
+const toastEl = document.getElementById('toast');
+let toastTimer;
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 3200);
+}
+
+const dialogEl = document.getElementById('dialog');
+let dialogState = null;
+function say(lines, { blocking = false } = {}) {
+  closeDialog();
+  return new Promise((resolve) => {
+    dialogState = { lines, i: 0, resolve, blocking };
+    if (blocking) blockingUI++;
+    dialogEl.classList.toggle('blocking', blocking);
+    showLine();
+  });
+}
+function showLine() {
+  const { lines, i } = dialogState;
+  const [who, text] = lines[i];
+  const sp = SPEAKERS[who];
+  document.getElementById('dlgIcon').textContent = sp.icon;
+  document.getElementById('dlgName').textContent = sp.name;
+  document.getElementById('dlgText').textContent = text;
+  document.getElementById('dlgNext').textContent = i < lines.length - 1 ? 'Lanjut ›' : 'Tutup';
+  dialogEl.hidden = false;
+}
+function closeDialog() {
+  if (!dialogState) return;
+  const s = dialogState;
+  dialogState = null;
+  if (s.blocking) blockingUI--;
+  dialogEl.hidden = true;
+  s.resolve();
+}
+document.getElementById('dlgNext').onclick = () => {
+  if (!dialogState) return;
+  sfx('click');
+  if (dialogState.i < dialogState.lines.length - 1) { dialogState.i++; showLine(); } else closeDialog();
+};
+document.getElementById('btnHint').onclick = () => {
+  sfx('click');
+  say([['princess', HINTS[stage.id][Math.min(failCount, 2)]]]);
+};
+
+const storyEl = document.getElementById('storyOverlay');
+function playStory(label, slides) {
+  blockingUI++;
+  return new Promise((resolve) => {
+    let i = 0;
+    const show = () => {
+      document.getElementById('storyLabel').textContent = label;
+      const p = document.getElementById('storyText');
+      p.textContent = slides[i];
+      p.style.animation = 'none'; void p.offsetWidth; p.style.animation = '';
+      document.getElementById('storyDots').textContent = `${i + 1} / ${slides.length}`;
+      document.getElementById('storyNext').textContent = i < slides.length - 1 ? 'Lanjut ›' : 'Selesai';
+    };
+    const done = () => {
+      storyEl.hidden = true;
+      blockingUI--;
+      document.getElementById('storyNext').onclick = null;
+      document.getElementById('storySkip').onclick = null;
+      resolve();
+    };
+    document.getElementById('storyNext').onclick = () => { sfx('click'); if (++i < slides.length) show(); else done(); };
+    document.getElementById('storySkip').onclick = done;
+    storyEl.hidden = false;
+    show();
+  });
+}
+
+// ------------------------------------------------------------
+//  Alur stage
+// ------------------------------------------------------------
+async function loadStage(index, { intro = true } = {}) {
+  runToken++;
+  setRunning(false);
+  highlight(null);
+  closeDialog();
+  stage = LEVELS[index];
+  world = new World(stage);
+  store('last', index);
+  document.getElementById('stageTitle').textContent = `STAGE ${stage.id}`;
+  document.getElementById('stageSub').textContent = stage.name;
+  document.getElementById('concept').innerHTML =
+    `Konsep: <b>${stage.concept}</b><br>Engineering: <b>${stage.engineering}</b>`;
+  document.getElementById('clearLabel').textContent = stage.initialProgram ? 'Muat ulang program' : 'Hapus semua';
+  buildBoard();
+  applyMonsterModels();
+  resetVisual();
+  loadProgram();
+  renderPalette();
+  renderProgram();
+  elapsed = 0;
+  failCount = 0;
+  stageDone = false;
+  timeUpWarned = false;
+  updateHud();
+  startMusic();
+  if (intro && STAGE_INTRO[stage.id]) await say(STAGE_INTRO[stage.id], { blocking: true });
+}
+
+const titleEl = document.getElementById('titleOverlay');
+const stageOverlay = document.getElementById('stageOverlay');
+const winOverlay = document.getElementById('winOverlay');
+
+function openStages() {
+  const grid = document.getElementById('stageGrid');
+  const p = progress();
+  grid.innerHTML = '';
+  LEVELS.forEach((lv, i) => {
+    const b = document.createElement('button');
+    const locked = lv.id > p.unlocked;
+    const st = p.stars[lv.id];
+    b.className = 'stage-card' + (lv === stage && titleEl.hidden ? ' current' : '');
+    b.disabled = locked;
+    b.innerHTML = `<span class="no">${locked ? '🔒 ' : ''}Stage ${lv.id}</span>
+      <span class="nm">${lv.name}</span><span class="cp">${lv.concept}</span>
+      <span class="st">${st != null ? '★'.repeat(st) + '☆'.repeat(3 - st) : '&nbsp;'}</span>`;
+    b.onclick = () => { stageOverlay.hidden = true; titleEl.hidden = true; audio(); loadStage(i); };
+    grid.appendChild(b);
+  });
+  stageOverlay.hidden = false;
+}
+document.getElementById('btnStages').onclick = openStages;
+document.getElementById('btnTitleStages').onclick = openStages;
+document.getElementById('btnCloseStages').onclick = () => { stageOverlay.hidden = true; };
+stageOverlay.onclick = (e) => { if (e.target === stageOverlay) stageOverlay.hidden = true; };
+
+document.getElementById('btnStay').onclick = () => {
+  winOverlay.hidden = true;
+  loadStage(LEVELS.indexOf(stage), { intro: false });
+};
+document.getElementById('btnNext').onclick = async () => {
+  winOverlay.hidden = true;
+  const i = LEVELS.indexOf(stage);
+  if (i < LEVELS.length - 1) return loadStage(i + 1);
+  stopMusic();
+  await playStory('Epilog', EPILOG);
+  titleEl.hidden = false;
+};
+
+document.getElementById('gameTitle').textContent = GAME_TITLE;
+document.title = GAME_TITLE;
+document.getElementById('btnPlay').onclick = async () => {
+  audio();
+  titleEl.hidden = true;
+  if (!load('seenProlog', false)) {
+    await playStory('Prolog', PROLOG);
+    store('seenProlog', true);
+  }
+  const p = progress();
+  const last = load('last', 0);
+  loadStage(Math.min(last, p.unlocked - 1));
+};
+document.getElementById('btnProlog').onclick = async () => {
+  audio();
+  await playStory('Prolog', PROLOG);
+  store('seenProlog', true);
+};
+
+// ------------------------------------------------------------
+//  Mulai
+// ------------------------------------------------------------
+muted = load('muted', false);
+renderMute();
+loadStage(Math.min(load('last', 0), progress().unlocked - 1), { intro: false });
