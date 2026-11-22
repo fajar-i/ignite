@@ -34,9 +34,13 @@ initSaves(); // pilih slot aktif & migrasi data lama, sebelum ada yang membaca s
 //  walkSteps: jumlah langkah (petak) dalam satu klip jalan. Siklus jalan Mixamo = 2,
 //             animasi satu langkah (mis. "Long Step Forward") = 1 -> diputar dari awal tiap petak.
 // ============================================================
+//  idleClip / jumpClip: nama klip idle / lompat di dalam file `url` (opsional).
+//  includesPrincess: true bila putri sudah ada di dalam model -> putri bentuk dasar disembunyikan.
+// Model kesatria + putri digendong: dimodelkan, di-rig & dianimasikan oleh tim (Ilyas Saputra).
 const KNIGHT_MODEL = {
-  url: 'Walking.fbx', idleUrl: 'Idle.fbx', walkUrl: 'LongStepForward.fbx', walkSteps: 1,
-  height: 0.95, rotationY: 0, yOffset: 0, walkClip: 0,
+  url: 'MainKnightRig.glb', walkClip: 'Walk', walkSteps: 2, idleClip: 'Idle', jumpClip: 'Jump',
+  walkUrl: null, idleUrl: null, includesPrincess: true,
+  height: 1.25, rotationY: 0, yOffset: 0,
 };
 const PRINCESS_MODEL = { url: null, height: 0.35, rotationY: 0, offset: [0, 0.62, -0.24] };
 const MONSTER_MODEL = { url: null, height: 0.9, rotationY: 0, yOffset: 0 };
@@ -417,7 +421,7 @@ function loadRaw(url) {
 function stripRootMotion(clip) {
   if (clip.userData?.stripped) return clip;
   for (const t of clip.tracks) {
-    if (!/Hips\.position$/i.test(t.name)) continue;
+    if (!/(Hips|rootx)\.position$/i.test(t.name)) continue;
     const v = t.values;
     for (let i = 0; i < v.length; i += 3) { v[i] = v[0]; v[i + 2] = v[2]; }
   }
@@ -435,7 +439,8 @@ async function loadModel(cfg) {
     if (o.isSkinnedMesh) o.frustumCulled = false;
     for (const m of [].concat(o.material)) if (m.map) m.map.colorSpace = THREE.SRGBColorSpace;
   });
-  model.rotation.y = cfg.rotationY ?? 0;
+  // rotationX: koreksi model Z-up (mis. ekspor Blender tanpa konversi sumbu) -> -Math.PI / 2
+  model.rotation.set(cfg.rotationX ?? 0, cfg.rotationY ?? 0, 0, 'YXZ');
 
   // Skala otomatis dari tinggi model (Mixamo memakai satuan cm).
   const measure = () => {
@@ -460,13 +465,16 @@ async function loadModel(cfg) {
 
 let mixer = null;
 let walkAction = null;
+let jumpAction = null;
+let moveAction = null; // aksi gerak yang sedang dipakai (jalan atau lompat)
 let walkRate = 0; // 0 = diam, >0 = kecepatan animasi jalan
 let idleAction = null;
 let walkW = 0; // bobot campuran jalan (0 = idle penuh, 1 = jalan penuh)
 let princessObj = buildPrincess();
-function setKnightObject(obj) {
+function setKnightObject(obj, { withPrincess = true } = {}) {
   knightBody.clear();
-  knightBody.add(obj, princessObj);
+  knightBody.add(obj);
+  if (withPrincess) knightBody.add(princessObj);
 }
 setKnightObject(buildKnight());
 
@@ -478,8 +486,8 @@ async function applyCustomModels() {
       model.traverse((o) => {
         if (o.isMesh) for (const m of [].concat(o.material)) if (m.emissive) knightMats.push(m);
       });
-      setKnightObject(wrap);
-      mixer = null; walkAction = null; idleAction = null; walkW = 0;
+      setKnightObject(wrap, { withPrincess: !KNIGHT_MODEL.includesPrincess });
+      mixer = null; walkAction = null; idleAction = null; jumpAction = null; moveAction = null; walkW = 0;
       let walkAnims = animations;
       if (KNIGHT_MODEL.walkUrl) {
         try { walkAnims = (await loadRaw(KNIGHT_MODEL.walkUrl)).animations; }
@@ -492,6 +500,20 @@ async function applyCustomModels() {
         mixer = new THREE.AnimationMixer(model);
         walkAction = mixer.clipAction(stripRootMotion(clip));
         walkAction.play();
+      }
+      const byName = (name) => name && animations.find((a) => a.name === name);
+      const idleOwn = !KNIGHT_MODEL.idleUrl && byName(KNIGHT_MODEL.idleClip);
+      if (idleOwn) {
+        mixer ??= new THREE.AnimationMixer(model);
+        idleAction = mixer.clipAction(stripRootMotion(idleOwn));
+        idleAction.play();
+        walkAction?.setEffectiveWeight(0);
+      }
+      const jumpOwn = byName(KNIGHT_MODEL.jumpClip);
+      if (jumpOwn && mixer) {
+        jumpAction = mixer.clipAction(stripRootMotion(jumpOwn));
+        jumpAction.play();
+        jumpAction.setEffectiveWeight(0);
       }
       if (KNIGHT_MODEL.idleUrl) {
         try {
@@ -597,9 +619,11 @@ renderer.setAnimationLoop(() => {
       // campur halus idle <-> jalan
       walkW += ((walkRate > 0 ? 1 : 0) - walkW) * Math.min(1, dt * 12);
       idleAction.setEffectiveWeight(1 - walkW);
-      if (walkAction) {
-        walkAction.setEffectiveWeight(walkW);
-        if (walkRate > 0) walkAction.setEffectiveTimeScale(walkRate);
+      for (const act of [walkAction, jumpAction]) {
+        if (!act) continue;
+        const active = act === (moveAction || walkAction);
+        act.setEffectiveWeight(active ? walkW : 0);
+        if (active && walkRate > 0) act.setEffectiveTimeScale(walkRate);
       }
       mixer.update(dt);
     } else if (walkRate > 0) mixer.update(dt * walkRate);
@@ -651,10 +675,16 @@ async function travel(ev, token) {
   const from = knight.position.clone();
   const to = new THREE.Vector3(worldX(ev.to.x), H, worldZ(ev.to.z));
   const jump = ev.type === 'jump';
-  const arc = jump ? 0.7 : 0;
+  const arc = jump ? (jumpAction ? 0.3 : 0.7) : 0; // klip Jump sudah mengangkat tubuh sendiri
   const ms = dur(jump ? 560 : 420);
   // satu petak = satu langkah kaki = 1/walkSteps klip
-  if (walkAction) {
+  if (jump && jumpAction) {
+    // klip lompat diputar penuh sekali selama lompatan
+    moveAction = jumpAction;
+    jumpAction.time = 0;
+    walkRate = jumpAction.getClip().duration / (ms / 1000);
+  } else if (walkAction) {
+    moveAction = walkAction;
     const steps = KNIGHT_MODEL.walkSteps || 2;
     if (steps === 1) walkAction.time = 0; // animasi satu langkah: mulai dari awal tiap petak
     walkRate = (walkAction.getClip().duration / steps) / (ms / 1000);
@@ -772,7 +802,7 @@ const SAMPLES = {
   caught: { file: 'move/attack.mp3', gain: 0.45 },      // ditangkap monster
   fall:   { file: 'move/dive.mp3', gain: 0.4 },         // jatuh ke lubang
   splash: { file: 'move/splash.mp3', gain: 0.45 },      // tercebur sungai racun
-  fail:   { file: 'move/teleport.mp3', gain: 0.3 },     // program gagal, kesatria kembali
+  fail:   { file: 'fail.mp3', gain: 0.4 },              // program gagal ("oopsies", wefgf, Pixabay)
 };
 // Tanpa suara: wait (diam di tempat).
 const buffers = {};
@@ -2180,7 +2210,9 @@ document.getElementById('btnTitleProfile').onclick = openProfile;
 // ---------- Kredit ----------
 const creditsOverlay = document.getElementById('creditsOverlay');
 function openCredits() {
-  const link = (it) => `<a href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">${esc(it.who)}</a>`;
+  const link = (it) => (it.url
+    ? `<a href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">${esc(it.who)}</a>`
+    : esc(it.who));
   const team = TEAM.length
     ? `<section class="cr-group"><h3>Tim</h3><ul>${TEAM.map((m) =>
       `<li><b>${esc(m.name)}</b><span>${esc(m.role)}</span></li>`).join('')}</ul></section>`

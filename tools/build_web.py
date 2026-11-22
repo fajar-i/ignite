@@ -16,7 +16,7 @@ OUT = os.path.join(OUT_DIR, 'mata-sang-kesatria-web.zip')
 
 FILES = [
     'index.html', 'style.css', 'readme.md',
-    'Walking.fbx', 'Idle.fbx', 'LongStepForward.fbx',
+    'MainKnightRig.glb',
 ]
 DIRS = ['js', 'assets']
 SKIP = {

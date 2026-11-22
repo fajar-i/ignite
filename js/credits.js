@@ -5,13 +5,17 @@
 //  TEAM: isi nama anggota tim dan perannya. Bagian "Tim" hanya tampil bila
 //  daftar ini tidak kosong. Contoh: { name: 'Nama', role: 'Programmer' }
 // ============================================================
-export const TEAM = [];
+export const TEAM = [
+  { name: 'Fajari Arkan F', role: 'Programmer' },
+  { name: 'Andika Bahari M', role: 'Programmer, Writer, Quality Assurance' },
+  { name: 'Ilyas Saputra', role: 'Game Designer, 3D Artist' },
+];
 
 export const CREDITS = [
   {
     group: 'Karakter & animasi',
     items: [
-      { what: 'Model kesatria, animasi melangkah & diam', who: 'Mixamo (Adobe)', url: 'https://www.mixamo.com', license: 'Lisensi Mixamo' },
+      { what: 'Model 3D kesatria & putri, rig, animasi diam/jalan/lompat', who: 'Ilyas Saputra (tim)', url: '', license: 'Karya tim' },
     ],
   },
   {
@@ -26,6 +30,7 @@ export const CREDITS = [
     items: [
       { what: 'Klik tombol & blok', who: 'Universfield', url: 'https://pixabay.com/users/universfield-28281460/', license: 'Pixabay Content License' },
       { what: 'Bab selesai & kartu "Blok Baru!"', who: 'Universfield', url: 'https://pixabay.com/users/universfield-28281460/', license: 'Pixabay Content License' },
+      { what: 'Program gagal ("oopsies")', who: 'wefgf', url: 'https://pixabay.com/users/wefgf-52753747/', license: 'Pixabay Content License' },
       { what: 'Gerakan kesatria ("12 Player Movement SFX", dinormalisasi & dikonversi ke MP3)', who: 'leohpaz', url: 'https://opengameart.org/content/12-player-movement-sfx', license: 'CC BY 4.0' },
     ],
   },
