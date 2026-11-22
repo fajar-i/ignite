@@ -6,6 +6,17 @@
   /* Nodesto sempit (lebar ~67% Cinzel): diperbesar agar heading tidak terlihat mengecil. */
   size-adjust: 150%;
 }
+/* Font paragraf Rosario (SIL OFL 1.1, lisensi di assets/fonts/rosario/OFL.txt). Variabel: wght 300-700. */
+@font-face {
+  font-family: "Rosario";
+  src: url("assets/fonts/rosario/Rosario-VariableFont_wght.ttf") format("truetype");
+  font-weight: 300 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Rosario";
+  src: url("assets/fonts/rosario/Rosario-Italic-VariableFont_wght.ttf") format("truetype");
+  font-weight: 300 700; font-style: italic; font-display: swap;
+}
 /* Huruf hias awal (drop cap); hanya berisi huruf A-Z. */
 @font-face {
   font-family: "Solbera Imitation";
@@ -58,7 +69,7 @@
      overlay/soft-light = kontras seimbang. */
   --tex-blend: multiply;
   --title-font: "Nodesto Caps Condensed", "Cinzel", "Times New Roman", serif;
-  --body-font: "Lora", Georgia, serif;
+  --body-font: "Rosario", "Segoe UI", system-ui, sans-serif;
   --initial-font: "Solbera Imitation", var(--title-font);
 }
 
@@ -229,6 +240,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .code-panel {
   position: absolute; top: calc(var(--gap) + var(--sa-t)); right: calc(var(--gap) + var(--sa-r)); bottom: calc(var(--gap) + var(--sa-b)); width: var(--panel-w);
   padding: 1.2rem 1.3rem 1.2rem; display: flex; flex-direction: column; min-height: 0;
+  overflow-y: auto; overflow-x: hidden; /* layar pendek: panel bergulir, isi tidak menumpuk */
 }
 .panel-title {
   font-family: var(--title-font); font-weight: 700; font-size: 1.1rem; letter-spacing: 0.08em; margin: 0;
@@ -238,7 +250,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 h2 { font-family: var(--title-font); font-weight: 700; margin: 0; letter-spacing: 0.05em; }
 .sub { margin: 0.1rem 0 0.7rem; color: var(--ink-soft); font-size: 0.88rem; font-style: italic; }
 .section { margin-bottom: 0.9rem; position: relative; }
-.section.grow { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.section.grow { flex: 1; display: flex; flex-direction: column; min-height: 10rem; } /* >= judul + area program (7rem) */
 
 .palette { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
 .pal-btn {
