@@ -587,10 +587,14 @@ function resetVisual() {
 // ------------------------------------------------------------
 //  Loop render
 // ------------------------------------------------------------
+let paused = false;
+let simTime = 0;
 const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.05);
-  const t = clock.elapsedTime;
+  if (paused) { renderer.render(scene, camera); return; }
+  simTime += dt;
+  const t = simTime;
   const f = Math.min(1, dt * 7);
   if (mixer) {
     if (idleAction) {
@@ -636,12 +640,19 @@ const lerp = (a, b, t) => a + (b - a) * t;
 
 function tween(ms, fn, token) {
   return new Promise((resolve) => {
-    const t0 = performance.now();
+    let acc = 0;
+    let prev = performance.now();
     const step = (now) => {
       if (token !== runToken) return resolve(false);
-      const t = Math.min(1, (now - t0) / ms);
-      fn(t);
-      if (t < 1) requestAnimationFrame(step); else resolve(true);
+      const dt = Math.min(100, now - prev);
+      prev = now;
+      if (!paused) {
+        acc += dt;
+        const t = Math.min(1, acc / ms);
+        fn(t);
+        if (t >= 1) return resolve(true);
+      }
+      requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
   });
@@ -823,8 +834,9 @@ let musicOn = true; // dimatikan sementara oleh stopMusic (mis. saat epilog)
 function updateMusic() {
   const onTitle = !titleEl.hidden;
   const allowed = !muted && settings.music > 0;
-  for (const [t, want] of [[menuTrack, allowed && onTitle], [gameTrack, allowed && !onTitle && musicOn]]) {
-    t.a.volume = Math.min(1, t.vol * (settings.music / 100));
+  const duck = paused && document.getElementById('settingsOverlay')?.hidden ? 0.4 : 1;
+  for (const [t, want, mult] of [[menuTrack, allowed && onTitle, 1], [gameTrack, allowed && !onTitle && musicOn, duck]]) {
+    t.a.volume = Math.min(1, t.vol * (settings.music / 100) * mult);
     if (want && t.a.paused) t.a.play().catch(() => { /* menunggu gestur pertama */ });
     else if (!want && !t.a.paused) t.a.pause();
   }
@@ -1362,8 +1374,8 @@ setInterval(() => {
   const now = performance.now();
   const dt = (now - lastTick) / 1000;
   lastTick = now;
-  const menuOpen = !document.getElementById('slotOverlay').hidden || !document.getElementById('blockOverlay').hidden || !document.getElementById('dialogOverlay').hidden || !document.getElementById('askOverlay').hidden || !document.getElementById('profileOverlay').hidden || !document.getElementById('settingsOverlay').hidden || !document.getElementById('stageOverlay').hidden;
-  const active = !running && !editing && !stageDone && !menuOpen && blockingUI === 0 && document.getElementById('titleOverlay').hidden && document.visibilityState === 'visible';
+  const menuOpen = !document.getElementById('pauseOverlay').hidden || !document.getElementById('slotOverlay').hidden || !document.getElementById('blockOverlay').hidden || !document.getElementById('dialogOverlay').hidden || !document.getElementById('askOverlay').hidden || !document.getElementById('profileOverlay').hidden || !document.getElementById('settingsOverlay').hidden || !document.getElementById('stageOverlay').hidden;
+  const active = !paused && !running && !editing && !stageDone && !menuOpen && blockingUI === 0 && document.getElementById('titleOverlay').hidden && document.visibilityState === 'visible';
   if (!active) return;
   elapsed += dt;
   if (elapsed >= stage.time && !timeUpWarned) {
@@ -1752,6 +1764,7 @@ async function startLevel(lv, { intro = true, introduceBlocks = false } = {}) {
   runToken++;
   setRunning(false);
   highlight(null);
+  closePause();
   closeDialog();
   exitEditor();
   if (stage !== lv) bgfx.boost(); // latar berputar cepat 1 detik saat ganti bab
@@ -2323,7 +2336,7 @@ document.getElementById('btnExportSave').onclick = () => {
   const a = document.createElement('a');
   const safe = (player.name || 'profil').replace(/[^\w-]+/g, '_');
   a.href = URL.createObjectURL(blob);
-  a.download = `mata-sang-kesatria-${safe}.json`;
+  a.download = `eyes-for-the-nameless-${safe}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -2361,7 +2374,8 @@ document.getElementById('btnRename').onclick = async () => {
   if (n) { setName(n); renderTitle(); openProfile(); }
 };
 
-// ---------- pengaturan ----------
+// ---------- pengaturan & menu jeda ----------
+const pauseOverlay = document.getElementById('pauseOverlay');
 const settingsOverlay = document.getElementById('settingsOverlay');
 function openSettings() {
   document.querySelectorAll('#setText button').forEach((b) => b.classList.toggle('on', b.dataset.v === settings.text));
@@ -2371,6 +2385,24 @@ function openSettings() {
   document.getElementById('setMotion').checked = settings.motion;
   document.getElementById('setBgfx').checked = settings.bgfx !== false;
   settingsOverlay.hidden = false;
+  updateMusic();
+}
+function openPause() {
+  if (!titleEl.hidden) return;
+  paused = true;
+  document.getElementById('pauseSub').textContent = editing
+    ? 'Mode Editor Level'
+    : `${stage.custom ? 'LEVEL CUSTOM' : chapterOf(stage)} · ${stage.name}${running ? ' (program berjalan)' : ''}`;
+  document.getElementById('btnPauseRestart').hidden = editing;
+  pauseOverlay.hidden = false;
+  updateMusic();
+  sfx('click');
+}
+function closePause() {
+  if (!paused && pauseOverlay.hidden) return;
+  paused = false;
+  pauseOverlay.hidden = true;
+  updateMusic();
 }
 const saveSettings = () => { store('settings', settings); applySettings(); };
 document.querySelectorAll('#setText button').forEach((b) => {
@@ -2382,22 +2414,44 @@ document.getElementById('setSfx').onchange = () => sfx('click');
 document.getElementById('setContrast').onchange = (e) => { settings.contrast = e.target.checked; saveSettings(); };
 document.getElementById('setMotion').onchange = (e) => { settings.motion = e.target.checked; saveSettings(); };
 document.getElementById('setBgfx').onchange = (e) => { settings.bgfx = e.target.checked; saveSettings(); };
-document.getElementById('btnSettings').onclick = openSettings;
 document.getElementById('btnTitleSettings').onclick = openSettings;
-document.getElementById('btnCloseSettings').onclick = () => { settingsOverlay.hidden = true; };
-settingsOverlay.onclick = (e) => { if (e.target === settingsOverlay) settingsOverlay.hidden = true; };
+document.getElementById('btnCloseSettings').onclick = () => { settingsOverlay.hidden = true; updateMusic(); };
+settingsOverlay.onclick = (e) => { if (e.target === settingsOverlay) { settingsOverlay.hidden = true; updateMusic(); } };
+
+document.getElementById('btnPause').onclick = openPause;
+document.getElementById('btnResume').onclick = () => { sfx('click'); closePause(); };
+document.getElementById('btnPauseRestart').onclick = () => { sfx('click'); closePause(); startLevel(stage, { intro: false }); };
+document.getElementById('btnPauseSettings').onclick = () => { sfx('click'); openSettings(); };
+document.getElementById('btnPauseHome').onclick = () => { sfx('click'); goToMenu(); };
+pauseOverlay.onclick = (e) => { if (e.target === pauseOverlay) { sfx('click'); closePause(); } };
+
+document.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() !== 'p' || e.ctrlKey || e.altKey || e.metaKey) return;
+  const a = document.activeElement;
+  if (a && ['INPUT', 'SELECT', 'TEXTAREA'].includes(a.tagName)) return;
+  if (!titleEl.hidden || editing) return;
+  if (!pauseOverlay.hidden && settingsOverlay.hidden && askEl.hidden) {
+    e.preventDefault();
+    sfx('click');
+    closePause();
+  } else if (!anyOverlayOpen()) {
+    e.preventDefault();
+    openPause();
+  }
+});
 
 // ---------- shell UI: screen stack, fokus, keyboard & gamepad ----------
-// "Kembali" (Esc / tombol B): tutup layar teratas, lalu dialog, lalu keluar dari wadah blok.
+// "Kembali" (Esc / tombol B): tutup layar teratas, lalu dialog, lalu keluar dari wadah blok, lalu buka jeda.
 function goBack() {
   if (!askEl.hidden) { askResolve?.(null); return; }
   if (!creditsOverlay.hidden) { creditsOverlay.hidden = true; return; }
   if (!blockOverlay.hidden) { blockCardsDone?.(); return; }
   if (!slotOverlay.hidden) { slotOverlay.hidden = true; return; }
   if (!dialogOverlay.hidden) { closeDialog(); return; }
-  if (!settingsOverlay.hidden) { settingsOverlay.hidden = true; return; }
+  if (!settingsOverlay.hidden) { settingsOverlay.hidden = true; updateMusic(); return; }
   if (!profileOverlay.hidden) { profileOverlay.hidden = true; return; }
   if (!stageOverlay.hidden) { stageOverlay.hidden = true; return; }
+  if (!pauseOverlay.hidden) { closePause(); return; }
   if (!winOverlay.hidden) { document.getElementById('btnStay').click(); return; }
   if (!storyEl.hidden) { document.getElementById('storySkip').click(); return; }
   if (!titleEl.hidden) return;
@@ -2414,10 +2468,13 @@ function goBack() {
     activeList = 'main';
     renderProgram(owner);
     showToast('Blok baru kembali masuk ke program utama');
+    return;
   }
+  openPause();
 }
 // Kembali ke menu utama (sampul). Program & level custom sudah tersimpan otomatis.
 function goToMenu() {
+  paused = false;
   runToken++;
   setRunning(false);
   highlight(null);
@@ -2428,14 +2485,13 @@ function goToMenu() {
     if (editor.draft) saveCustom(editor.draft);
     exitEditor();
   }
-  for (const o of [settingsOverlay, profileOverlay, stageOverlay, winOverlay, slotOverlay]) o.hidden = true;
+  for (const o of [pauseOverlay, settingsOverlay, profileOverlay, stageOverlay, winOverlay, slotOverlay, creditsOverlay]) o.hidden = true;
   world.reset();
   resetVisual();
   stopMusic();
   renderTitle();
   titleEl.hidden = false;
 }
-document.getElementById('btnHome').onclick = goToMenu;
 
 const isOpen = (id) => !document.getElementById(id).hidden;
 const overlays = [...document.querySelectorAll('.overlay')];
@@ -2447,7 +2503,16 @@ initUI({
     back: goBack,
     run: () => { if (anyOverlayOpen() || editing) return; runBtn.click(); },
     hint: () => { if (!anyOverlayOpen() && !editing) document.getElementById('btnHint').click(); },
-    menu: () => { if (isOpen('settingsOverlay')) settingsOverlay.hidden = true; else openSettings(); },
+    menu: () => {
+      if (!titleEl.hidden) {
+        if (isOpen('settingsOverlay')) settingsOverlay.hidden = true;
+        else openSettings();
+        return;
+      }
+      if (isOpen('settingsOverlay')) { settingsOverlay.hidden = true; updateMusic(); return; }
+      if (!pauseOverlay.hidden) { closePause(); return; }
+      if (!anyOverlayOpen()) openPause();
+    },
     toast: (m) => showToast(m),
   },
 });

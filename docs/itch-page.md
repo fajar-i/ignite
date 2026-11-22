@@ -1,15 +1,15 @@
-# Draf halaman itch.io: Mata Sang Kesatria
+# Draf halaman itch.io: Eyes for the Nameless
 
 > Salin bagian di bawah garis ke editor halaman itch.io. Ganti bagian [dalam kurung siku].
 > Checklist wajib dari rulebook ada di paling bawah.
 
 ---
 
-## Mata Sang Kesatria
+## Eyes for the Nameless
 
 **Seorang kesatria kehilangan penglihatannya. Kamulah matanya.**
 
-*Mata Sang Kesatria* adalah game puzzle pemrograman 3D untuk belajar berpikir komputasional. Pemain menyusun blok perintah (Maju, Belok, Lompat, Ulangi, Jika, Tarik Tuas, Fungsi) untuk menuntun kesatria buta keluar dari kastil, dibimbing suara sang putri.
+*Eyes for the Nameless* adalah game puzzle pemrograman 3D untuk belajar berpikir komputasional. Pemain menyusun blok perintah (Maju, Belok, Lompat, Ulangi, Jika, Tarik Tuas, Fungsi) untuk menuntun kesatria buta keluar dari kastil, dibimbing suara sang putri.
 
 ### Tema: STEM Education
 **Sub-tema: Sebab Akibat & Satu Langkah Kecil**
@@ -40,7 +40,8 @@ Fitur: 5 bab bercerita dengan plot twist, 3 bintang per bab (waktu menyusun), pe
 |---|---|
 | Panah | Pindah fokus antar tombol/blok |
 | Enter / Spasi | Pilih |
-| Esc | Kembali / tutup |
+| Esc | Kembali / tutup / jeda |
+| P | Jeda permainan |
 | Delete / Backspace | Hapus blok terpilih |
 | Alt + ↑ / ↓ | Geser blok terpilih |
 | Enter (pada Ulangi/Jika) | Masuk ke isi blok |
@@ -56,7 +57,7 @@ Fitur: 5 bab bercerita dengan plot twist, 3 bintang per bab (waktu menyusun), pe
 | Y | Jalankan program |
 | X | Minta petunjuk |
 | LB / RB | Geser blok naik / turun |
-| Start | Pengaturan |
+| Start | Jeda / pengaturan |
 
 ### Cara bermain di browser
 Klik **Run game**. Butuh koneksi internet (mesin 3D Three.js dimuat dari CDN). Disarankan Chrome/Edge/Firefox versi terbaru. Jika terasa berat, matikan **Pengaturan → Latar animasi**.
@@ -102,5 +103,5 @@ Emoji pada dialog dan editor menggunakan font bawaan sistem operasi.
 - [ ] Video gameplay singkat (bisa direkam setelah jam)
 - [ ] Kredit anggota tim & perannya
 - [ ] Kredit aset eksternal
-- [ ] Upload `dist/mata-sang-kesatria-web.zip` (buat dengan `python tools/build_web.py`), Kind of project: **HTML**, centang **This file will be played in the browser**, viewport disarankan 1280×720 + tombol fullscreen
+- [ ] Upload `dist/eyes-for-the-nameless-web.zip` (buat dengan `python tools/build_web.py`), Kind of project: **HTML**, centang **This file will be played in the browser**, viewport disarankan 1280×720 + tombol fullscreen
 - [ ] Kumpulkan sebelum 22 November 2026 pukul 23:59 WIB

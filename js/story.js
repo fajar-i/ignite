@@ -3,10 +3,10 @@
 //  Nama tokoh masih placeholder -> ganti di NAMES.
 // ============================================================
 
-export const GAME_TITLE = 'Mata Sang Kesatria'; // [TBD] judul sementara
+export const GAME_TITLE = 'Eyes for the Nameless';
 export const NAMES = {
   princess: 'Putri',
-  knight: 'Kesatria',
+  knight: 'Nameless Knight',
   king: 'Raja',
   land: 'Negeri yang Terlupakan',
 };
@@ -24,7 +24,7 @@ export const PROLOG = [
   'Hiduplah seorang putri di sebuah kerajaan ternama, di tanah yang indah dan megah. Suatu hari, sang putri berkelana ke Negeri yang Terlupakan untuk mencari Harta yang Terlupakan.',
   'Menurut cerita masyarakat, harta itu tersimpan di sebuah kastil tua yang telah usang. Sang putri menjelajahi kastil itu hingga tiba di menara tertingginya. Di sana, harta itu benar-benar ada.',
   'Namun harta itu menyimpan racun yang melumpuhkan kedua kakinya, dan sang putri pun terjebak di menara.',
-  'Enam bulan berlalu tanpa kabar. Sang raja mengutus kesatria kepercayaannya untuk mencari putri. Ia menyusul ke Negeri yang Terlupakan dan menemukan kastil yang sama.',
+  'Enam bulan berlalu tanpa kabar. Sang raja mengutus kesatria kepercayaannya—yang hanya dikenal sebagai Nameless Knight—untuk mencari putri. Ia menyusul ke Negeri yang Terlupakan dan menemukan kastil yang sama.',
   'Di dalam kastil, monster-monster bangkit dari jasad yang telah kehilangan jiwanya. Sang kesatria menumbangkan satu per satu hingga mencapai menara tertinggi.',
   'Sebelum ia sempat membuka pintu menara, seekor monster yang sengaja menunggu menjebaknya, dan kesatria itu kehilangan penglihatannya. Dari balik pintu, ia mendengar suara sang putri.',
   'Satu-satunya jalan keluar: penglihatan sang putri menjadi mata bagi sang kesatria. Maka kesatria itu menggendong sang putri dan memulai perjalanan keluar dari kastil.',
@@ -33,7 +33,7 @@ export const PROLOG = [
 
 export const EPILOG = [
   'Fajar menyingsing. Untuk pertama kalinya setelah sekian lama, udara terasa hangat.',
-  'Kesatria dan sang putri kembali menuju tanah kelahiran mereka. Sang kesatria tersenyum: ia berhasil.',
+  'Nameless Knight dan sang putri kembali menuju tanah kelahiran mereka. Sang kesatria tersenyum: ia berhasil.',
   'Namun ada satu hal yang tidak diketahui sang kesatria.',
   'Yang ia gendong bukanlah sang putri, melainkan entitas terkutuk yang dapat meniru siapa pun, termasuk suaranya.',
   'Entitas itu telah tersegel ratusan tahun. Kini bebas, ia berencana menebar teror ke seluruh negeri.',
