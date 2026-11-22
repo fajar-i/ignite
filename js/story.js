@@ -70,8 +70,9 @@ export const STAGE_INTRO = {
     ['princess', 'Racun itu... ya. Racun itu.'],
   ],
   5: [
-    ['princess', 'Gerbang kastil! Tapi golem penjaga masih berjaga, dan jembatan angkatnya macet.'],
-    ['princess', 'Aku sudah menyusun rencana, tapi sepertinya ada yang salah. Coba jalankan, lalu perbaiki bagian yang keliru.'],
+    ['princess', 'Gerbang kastil! Tapi ada golem batu yang berjaga, dan jembatan angkatnya macet.'],
+    ['princess', 'Hati-hati—berbeda dari monster biasa, tubuh golem batu terlalu besar untuk dilewati dengan Maju. Saat ia tertidur, kita harus melompatinya dengan Lompat!'],
+    ['princess', 'Aku sudah menyusun rencana, tapi sepertinya ada yang keliru. Coba jalankan, lalu perbaiki bagian yang salah.'],
     ['princess', 'Sedikit lagi. Sedikit lagi aku bebas... kita bebas.'],
   ],
 };
@@ -99,9 +100,9 @@ export const HINTS = {
     'Program utama: Maju, Panggil, Belok Kanan, Maju, Panggil, Belok Kiri, Maju, Panggil, Maju.',
   ],
   5: [
-    'Jalankan dulu programnya dan perhatikan di mana kesatria gagal. Itu petunjuk letak bug.',
-    'Ada tiga bug: satu kondisi terbalik, satu belokan salah arah, dan satu perulangan yang kelebihan.',
-    'Monster tertidur? harus berisi Maju (bukan Tunggu). Ganti Belok Kiri menjadi Belok Kanan. Ulangi Maju cukup 3 kali.',
+    'Jalankan dulu programnya dan perhatikan di mana kesatria tertahan atau gagal. Ingat: golem batu harus dilompati saat ia tertidur.',
+    'Ada tiga bug: saat golem tertidur masih memakai Maju (seharusnya Lompat), satu belokan salah arah, dan satu perulangan yang kelebihan.',
+    'Di dalam "Monster tertidur?", ganti Maju menjadi Lompat. Ganti Belok Kiri menjadi Belok Kanan. Ulangi Maju cukup 3 kali.',
   ],
 };
 
@@ -110,6 +111,7 @@ export const FAIL_LINES = {
   river: 'Racun! Petak itu air, bukan jembatan. Apakah tuasnya sudah ditarik?',
   trap: 'Aduh, duri! Gunakan Lompat untuk melewatinya.',
   caught: 'Monster itu bangun dan menangkap kita! Tunggu sampai ia tertidur.',
+  golem: 'Golem batu terlalu besar untuk dilewati dengan Maju! Gunakan Lompat saat ia tertidur.',
   incomplete: 'Perintahnya habis, tapi kita belum sampai di pintu keluar.',
   steps: 'Perintahnya terlalu panjang atau berputar terus. Periksa perulanganmu.',
   depth: 'Fungsi itu memanggil dirinya sendiri terus-menerus. Jangan panggil fungsi di dalam dirinya sendiri.',
@@ -121,6 +123,7 @@ export const EFFECT_LINES = {
   river: 'kesatria tercebur ke sungai racun',
   trap: 'kesatria menginjak duri',
   caught: 'monster terbangun dan menangkap kesatria',
+  golem: 'kesatria menabrak golem batu yang sedang tidur karena memakai Maju, bukan Lompat',
   incomplete: 'perintah habis sebelum kesatria sampai di pintu keluar',
   steps: 'program terus berputar dan tidak pernah selesai',
   depth: 'fungsi memanggil dirinya sendiri tanpa henti',

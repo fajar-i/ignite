@@ -23,7 +23,7 @@ export const BLOCK_INFO = {
     tip: 'Dua kali Belok Kanan = berbalik arah.',
   },
   jump: {
-    desc: 'Melompati satu petak di depan (lubang, duri, atau sungai) dan mendarat dua petak di depan. Tidak bisa melompati tembok atau monster.',
+    desc: 'Melompati satu petak di depan (lubang, duri, sungai, atau golem yang tertidur) dan mendarat dua petak di depan. Tidak bisa melompati tembok, monster biasa, atau golem yang bangun.',
     example: ['maju', 'lompat'],
     note: 'Kesatria maju, lalu melompati duri di depannya.',
     tip: 'Petak pendaratan harus aman, atau kesatria tetap gagal.',
@@ -49,7 +49,7 @@ export const BLOCK_INFO = {
   wait: {
     desc: 'Kesatria diam selama satu giliran. Berguna untuk menunggu monster tertidur.',
     example: [['jika', 'sleep', ['maju'], ['tunggu']]],
-    note: 'Kalau monster tidur, lewat. Kalau masih bangun, tunggu dulu.',
+    note: 'Kalau monster biasa tidur, Maju. Kalau golem batu tidur, Lompat. Kalau masih bangun, Tunggu dulu.',
     tip: 'Gabungkan dengan Ulangi agar kesatria terus bertanya sampai aman.',
   },
   call: {

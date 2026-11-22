@@ -52,6 +52,7 @@ export class World {
   constructor(level) {
     this.level = level;
     this.def = parseLevel(level);
+    this.isGolem = level.monsterKind === 'golem';
     this.cycle = level.monsterCycle || { awake: 2, sleep: 2 };
     this.reset();
   }
@@ -109,6 +110,7 @@ export class World {
     const c = this.cell(x, z);
     if (this.isBlocked(c)) return { result: 'bump' };
     const m = this.monsterAt(x, z);
+    if (m && this.isGolem && this.asleep(m)) return { result: 'bump', golem: true };
     this.x = x; this.z = z;
     if (m && !this.asleep(m)) return { result: 'caught', monster: this.monsters.indexOf(m) };
     if (c.kind === 'hole') return { result: 'fall' };
@@ -137,8 +139,16 @@ export class World {
     } else if (type === 'jump') {
       const mid = this.frontPos(1), land = this.frontPos(2);
       const mc = this.cell(mid.x, mid.z);
-      if (this.isBlocked(mc) || this.monsterAt(mid.x, mid.z)) ev.result = 'bump';
-      else ev = { ...ev, ...this.enter(land.x, land.z) };
+      const midM = this.monsterAt(mid.x, mid.z);
+      if (this.isBlocked(mc)) ev.result = 'bump';
+      else if (midM) {
+        if (this.isGolem) {
+          if (this.asleep(midM)) ev = { ...ev, ...this.enter(land.x, land.z) };
+          else { ev.result = 'caught'; ev.monster = this.monsters.indexOf(midM); }
+        } else {
+          ev.result = 'bump';
+        }
+      } else ev = { ...ev, ...this.enter(land.x, land.z) };
     }
     ev.to = { x: this.x, z: this.z };
     ev.dir = this.dir;
