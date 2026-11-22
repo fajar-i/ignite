@@ -25,7 +25,7 @@
 }
 
 /* ============================================================
-   Mata Sang Kesatria — tema storybook (perkamen & lilin merah)
+   Eyes for the Nameless — tema storybook (perkamen & lilin merah)
    Semua ukuran memakai rem -> ikut pengaturan "Ukuran teks".
    ============================================================ */
 :root {
@@ -160,7 +160,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   display: flex; align-items: flex-start; gap: 0.75rem; pointer-events: none;
 }
 .topbar > * { pointer-events: auto; }
-.topbar > #btnHome { align-self: center; flex: none; }
+.topbar > #btnPause { align-self: center; flex: none; }
 .banner {
   background: var(--paper); background-image: var(--noise); background-blend-mode: var(--tex-blend);
   border: 1px solid var(--paper-edge); border-radius: 0.5rem;
@@ -845,3 +845,9 @@ textarea.ask-field { font-family: ui-monospace, Consolas, monospace; font-size: 
   display: block; text-align: center; font-size: 0.82rem; font-weight: 700; color: #fff;
   background: var(--bad); border-radius: 0.35rem; padding: 0.25rem 0.5rem;
 }
+
+/* ---------- menu jeda ---------- */
+.pause-card { width: min(24rem, 100%); }
+.pause-sub { margin: 0 0 1.1rem; font-style: italic; font-size: 0.92rem; color: var(--ink-soft); }
+.pause-actions { display: flex; flex-direction: column; gap: 0.55rem; width: min(17.5rem, 100%); margin: 0 auto; }
+.pause-actions .run, .pause-actions .btn { width: 100%; }

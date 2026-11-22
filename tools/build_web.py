@@ -1,7 +1,7 @@
 """Bungkus game menjadi zip siap unggah ke itch.io (HTML5 / WebGL).
 
 Pakai:  python tools/build_web.py
-Hasil:  dist/mata-sang-kesatria-web.zip  (index.html berada di akar zip)
+Hasil:  dist/eyes-for-the-nameless-web.zip  (index.html berada di akar zip)
 
 Hanya file yang dipakai game yang dimasukkan (daftar putih), jadi file kerja
 seperti .git, .claude, serve.py, tools/, dan tekstur cadangan tidak ikut.
@@ -12,7 +12,7 @@ import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, 'dist')
-OUT = os.path.join(OUT_DIR, 'mata-sang-kesatria-web.zip')
+OUT = os.path.join(OUT_DIR, 'eyes-for-the-nameless-web.zip')
 
 FILES = [
     'index.html', 'style.css', 'readme.md',

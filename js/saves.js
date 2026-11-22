@@ -7,7 +7,8 @@
 const ROOT = 'kesatria.';
 export const SLOT_COUNT = 3;
 const GLOBAL = new Set(['settings', 'muted', 'activeSlot']);
-const SAVE_FORMAT = 'mata-sang-kesatria-save';
+const SAVE_FORMAT = 'eyes-for-the-nameless-save';
+const ACCEPTED_FORMATS = new Set([SAVE_FORMAT, 'mata-sang-kesatria-save']);
 
 const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch { return false; } };
@@ -85,7 +86,7 @@ export function exportSlot(s) {
 export function parseSaveFile(text) {
   let obj;
   try { obj = JSON.parse(text); } catch { throw new Error('File bukan simpanan yang sah (JSON rusak).'); }
-  if (obj?.format !== SAVE_FORMAT || typeof obj.data !== 'object' || !obj.data) throw new Error('File ini bukan simpanan Mata Sang Kesatria.');
+  if (!ACCEPTED_FORMATS.has(obj?.format) || typeof obj.data !== 'object' || !obj.data) throw new Error('File ini bukan simpanan Eyes for the Nameless.');
   const player = (() => { try { return JSON.parse(obj.data.player); } catch { return null; } })();
   if (!player?.name) throw new Error('Simpanan tidak berisi profil pemain.');
   for (const [k, v] of Object.entries(obj.data)) {
