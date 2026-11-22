@@ -39,6 +39,8 @@ export const CREDITS = [
     group: 'Gambar & ikon',
     items: [
       { what: 'Tekstur kertas (dipotong & disambung)', who: 'Olga Thelavart · Unsplash', url: 'https://unsplash.com/@olga_o', license: 'Unsplash License' },
+      { what: 'Tekstur batu lantai & dinding (dipotong & diperkecil)', who: 'designed by upklyak - Magnific.com', url: 'https://www.magnific.com/free-vector/game-texture-stones-pebbles-seamless-pattern_23954927.htm', license: 'Lisensi Gratis Magnific (wajib atribusi)' },
+      { what: 'Tekstur papan jembatan kayu (satu bilah dipotong & diperkecil)', who: 'designed by macrovector - Magnific.com', url: 'https://www.magnific.com/free-vector/wooden-horizontal-planks-background_9398307.htm', license: 'Lisensi Gratis Magnific (wajib atribusi)' },
       { what: 'Ikon tombol & blok', who: 'Lucide Contributors', url: 'https://lucide.dev', license: 'ISC' },
     ],
   },

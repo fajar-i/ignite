@@ -165,7 +165,7 @@ function resolveTexSlot(spec) {
   return spec.url ? spec : null;
 }
 
-function loadBoardTexture(spec) {
+function loadBoardTexture(spec, isColor = true) {
   const { url, repeat } = spec;
   const cacheKey = `${url}|${Array.isArray(repeat) ? repeat.join(',') : ''}`;
   if (!texCache.has(cacheKey)) {
@@ -175,9 +175,11 @@ function loadBoardTexture(spec) {
       undefined,
       (err) => console.error('Gagal memuat tekstur papan:', url, err),
     );
-    tex.colorSpace = THREE.SRGBColorSpace;
+    if (isColor) tex.colorSpace = THREE.SRGBColorSpace;
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
+    // Anisotropi rendah: lantai terlihat miring dari kamera, 4x sudah cukup tajam & murah.
+    tex.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
     if (Array.isArray(repeat)) tex.repeat.set(repeat[0] ?? 1, repeat[1] ?? 1);
     cachedTextures.add(tex);
     texCache.set(cacheKey, tex);
@@ -189,8 +191,40 @@ function texturedStd(fallbackColor, texSpec, extra = {}) {
   const slot = resolveTexSlot(texSpec);
   if (!slot) return std(fallbackColor, extra);
   const map = loadBoardTexture(slot);
-  const color = slot.tint === 'theme' ? fallbackColor : (slot.tint ?? 0xffffff);
-  return std(color, { ...extra, map });
+  // tint 'theme': warna tema bab x tekstur. `gain` mengimbangi kecerahan rata-rata tekstur
+  // agar hasil akhirnya tetap seterang warna tema aslinya.
+  const color = slot.tint === 'theme'
+    ? new THREE.Color(fallbackColor).multiplyScalar(slot.gain ?? 1)
+    : (slot.tint ?? 0xffffff);
+  const mat = std(color, { ...extra, map });
+  if (slot.normal) {
+    mat.normalMap = loadBoardTexture({ url: slot.normal, repeat: slot.repeat }, false);
+    const ns = slot.normalScale ?? 1;
+    mat.normalScale.set(ns, ns);
+  }
+  mat.userData.span = Math.max(1, slot.span | 0 || 1);
+  return mat;
+}
+
+// Geometri petak yang UV sisi atasnya hanya memakai sebagian tekstur, sehingga satu
+// tekstur membentang di `span` x `span` petak (tidak terlihat berulang tiap petak).
+// Hanya ada span*span varian yang dipakai bersama, jadi tetap murah.
+function spanTileGeos(baseGeo, span) {
+  if (span <= 1) return null;
+  const out = [];
+  for (let qz = 0; qz < span; qz++) {
+    for (let qx = 0; qx < span; qx++) {
+      const g = baseGeo.clone();
+      const uv = g.attributes.uv;
+      // BoxGeometry: sisi +x, -x, +y (atas), ... masing-masing 4 verteks -> atas = 8..11
+      for (let vi = 8; vi < 12; vi++) {
+        uv.setXY(vi, (baseGeo.attributes.uv.getX(vi) + qx) / span, (baseGeo.attributes.uv.getY(vi) + span - 1 - qz) / span);
+      }
+      uv.needsUpdate = true;
+      out.push(g);
+    }
+  }
+  return out;
 }
 
 function disposeGroup(g) {
@@ -240,10 +274,15 @@ function buildBoard({ resetCamera = true } = {}) {
   const tileEdges = new THREE.EdgesGeometry(tileGeo);
   const WALL_H = 0.85;
   const wallGeo = new THREE.BoxGeometry(1, WALL_H, 1);
-  const wallEdges = new THREE.EdgesGeometry(wallGeo);
+  // Dinding tanpa garis tepi: tekstur batu sudah memberi batas, dinding terlihat menyatu.
 
+  const wallSpan = wallTop.userData.span || 1;
+  const wallGeos = spanTileGeos(wallGeo, wallSpan);
+  const span = topM.userData.span || 1;
+  const tileGeos = spanTileGeos(tileGeo, span);
   const addTile = (x, z) => {
-    const m = new THREE.Mesh(tileGeo, [sideM, sideM, topM, sideM, sideM, sideM]);
+    const geo = tileGeos ? tileGeos[(((z % span) + span) % span) * span + (((x % span) + span) % span)] : tileGeo;
+    const m = new THREE.Mesh(geo, [sideM, sideM, topM, sideM, sideM, sideM]);
     m.position.set(worldX(x), H / 2, worldZ(z));
     m.castShadow = m.receiveShadow = true;
     m.add(new THREE.LineSegments(tileEdges, edgeM));
@@ -266,10 +305,10 @@ function buildBoard({ resetCamera = true } = {}) {
       const wx = worldX(x), wz = worldZ(z);
       if (c.kind === 'hole') continue;
       if (c.kind === 'wall') {
-        const m = new THREE.Mesh(wallGeo, [wallSide, wallSide, wallTop, wallSide, wallSide, wallSide]);
+        const wg = wallGeos ? wallGeos[(((z % wallSpan) + wallSpan) % wallSpan) * wallSpan + (((x % wallSpan) + wallSpan) % wallSpan)] : wallGeo;
+        const m = new THREE.Mesh(wg, [wallSide, wallSide, wallTop, wallSide, wallSide, wallSide]);
         m.position.set(wx, WALL_H / 2, wz);
         m.castShadow = m.receiveShadow = true;
-        m.add(new THREE.LineSegments(wallEdges, edgeM));
         board.add(m);
         continue;
       }

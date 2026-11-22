@@ -106,12 +106,29 @@ export const MODELS = {
  */
 export const TEXTURES = {
   default: {
-    floor: null,     // permukaan atas petak lantai
+    // Tekstur batu bergaya lukis (512px, tanpa normal map: bayangan sudah tergambar).
+    // tint 'theme' + gain: diwarnai tema tiap bab; satu tekstur membentang 2x2 petak.
+    floor: {         // permukaan atas petak lantai: batu kerikil
+      url: 'assets/textures/stone_floor.jpg',
+      tint: 'theme',
+      gain: 1,
+      span: 1,
+    },
     floorSide: null, // sisi samping petak lantai
-    wall: null,      // sisi samping dinding
-    wallTop: null,   // permukaan atas dinding
+    wall: {          // sisi samping dinding: balok batu, lebih gelap dari lantai
+      url: 'assets/textures/stone_wall.jpg',
+      tint: 'theme',
+      gain: 1.5,
+    },
+    wallTop: {       // permukaan atas dinding
+      url: 'assets/textures/stone_wall.jpg',
+      tint: 'theme',
+      gain: 2,
+      span: 1,
+    },
     water: null,     // permukaan sungai/air
-    wood: null,      // papan jembatan kayu
+    // papan jembatan kayu: satu bilah papan (diputar agar serat searah panjang papan), warna asli
+    wood: 'assets/textures/wood_plank.jpg',
     metal: null,     // duri, gerbang besi, batang tuas
     gold: null,      // gerbang tujuan emas
   },
