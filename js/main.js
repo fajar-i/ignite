@@ -2049,7 +2049,6 @@ function openProfile() {
   }).join('');
   profileOverlay.hidden = false;
 }
-document.getElementById('btnProfile').onclick = openProfile;
 document.getElementById('btnTitleProfile').onclick = openProfile;
 document.getElementById('btnCloseProfile').onclick = () => { profileOverlay.hidden = true; };
 profileOverlay.onclick = (e) => { if (e.target === profileOverlay) profileOverlay.hidden = true; };
@@ -2164,6 +2163,11 @@ document.getElementById('btnSaveNow').onclick = () => {
   touch();
   sfx('chime');
   showToast(`Progres tersimpan di Slot ${activeSlot()} · ${fmtSaved(Date.now())}`);
+  // Toast tertutup overlay Daftar bab, jadi konfirmasi juga tampil di tombolnya.
+  const b = document.getElementById('btnSaveNow');
+  clearTimeout(b._t);
+  b.textContent = `Tersimpan di Slot ${activeSlot()} ✓`;
+  b._t = setTimeout(() => { b.textContent = 'Simpan sekarang'; }, 2000);
 };
 document.getElementById('btnCloseSlots').onclick = () => { slotOverlay.hidden = true; };
 slotOverlay.onclick = (e) => { if (e.target === slotOverlay) slotOverlay.hidden = true; };

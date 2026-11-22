@@ -47,9 +47,6 @@
         <button class="icon-btn" id="btnStages" title="Daftar bab">
           <svg viewBox="0 0 24 24"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2.5Z"/><path d="M8 7h7M8 11h5"/></svg>
         </button>
-        <button class="icon-btn" id="btnProfile" title="Profil">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
-        </button>
         <button class="icon-btn" id="btnSettings" title="Pengaturan">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
         </button>
@@ -174,7 +171,10 @@
         </div>
       </div>
       <div class="stage-grid" id="customGrid"></div>
-      <button class="btn" id="btnCloseStages">Tutup</button>
+      <div class="modal-actions">
+        <button class="btn" id="btnSaveNow">Simpan sekarang</button>
+        <button class="run small" id="btnCloseStages">Tutup</button>
+      </div>
     </div>
   </div>
 
@@ -208,7 +208,6 @@
       <h3 class="sec-title">Bintang per bab</h3>
       <div class="chapter-stars" id="chapterStars"></div>
       <div class="modal-actions">
-        <button class="btn" id="btnSaveNow">Simpan sekarang</button>
         <button class="btn" id="btnSwitchProfile">Ganti profil</button>
         <button class="btn" id="btnRename">Ganti nama</button>
         <button class="run small" id="btnCloseProfile" data-autofocus>Tutup</button>
