@@ -24,7 +24,7 @@ INK = (59, 42, 26)
 NIGHT_TOP = (42, 26, 60)
 NIGHT_BOT = (12, 8, 22)
 
-TITLE = 'MATA SANG KESATRIA'
+TITLE = 'EYES FOR THE NAMELESS'
 TAGLINE = 'Satu langkah kecil · satu perintah · satu akibat'
 
 
@@ -190,8 +190,8 @@ def cover():
     paste_card(img, (60, 36, 570, 250))
     d = ImageDraw.Draw(img)
     ornament(d, w // 2, 66, 130)
-    f_title = font(NODESTO, 74)
-    for i, line in enumerate(['MATA SANG', 'KESATRIA']):
+    f_title = fit(d, 'THE NAMELESS', NODESTO, 74, 450, spacing=3)
+    for i, line in enumerate(['EYES FOR', 'THE NAMELESS']):
         y = 80 + i * 70
         text_center(d, w // 2 + 2, y + 3, line, f_title, (90, 20, 20), spacing=3)
         text_center(d, w // 2, y, line, f_title, WAX, spacing=3)

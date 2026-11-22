@@ -537,6 +537,12 @@ body.hc {
 body.hc .pitem, body.hc .pal-btn, body.hc .btn, body.hc .stage-card, body.hc .chip { border-color: #000; }
 body.hc .concept { color: #fff; background: #000c; padding: 0.4rem 0.6rem; border-radius: 0.4rem; }
 body.rm *, body.rm *::before, body.rm *::after { animation: none !important; transition: none !important; }
+body.rf {
+  --title-font: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --body-font: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --initial-font: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+body.rf .story-text::first-letter { font-weight: 700; }
 
 /* ---------- layar kecil / HP ---------- */
 @media (max-width: 900px) {

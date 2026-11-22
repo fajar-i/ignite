@@ -142,6 +142,13 @@ export class World {
     }
     ev.to = { x: this.x, z: this.z };
     ev.dir = this.dir;
+    if (!['caught', 'fall', 'trap'].includes(ev.result)) {
+      const curM = this.monsterAt(this.x, this.z);
+      if (curM && !this.asleep(curM)) {
+        ev.result = 'caught';
+        ev.monster = this.monsters.indexOf(curM);
+      }
+    }
     this.tick++;
     if (['caught', 'fall', 'trap'].includes(ev.result)) this.status = 'lost';
     else if (this.x === this.def.exit.x && this.z === this.def.exit.z) this.status = 'won';
