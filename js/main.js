@@ -18,33 +18,15 @@ import { interpret, LimitError, fromCompact, newId, bumpId, childLists, countBlo
 import {
   GAME_TITLE, SPEAKERS, PROLOG, EPILOG, STAGE_INTRO, HINTS, FAIL_LINES, WIN_LINES, EFFECT_LINES,
 } from './story.js';
+import { MODELS, TEXTURES } from './assets-config.js';
 
 initSaves(); // pilih slot aktif & migrasi data lama, sebelum ada yang membaca simpanan
 
-// ============================================================
-//  MODEL 3D (.glb / .gltf / .fbx, mis. dari Mixamo)
-//  url    : path file, relatif terhadap index.html. null = kapsul placeholder.
-//  height : tinggi model di dunia game (1 petak = 1). Skala dihitung otomatis.
-//           Isi `scale` sebagai gantinya kalau mau angka manual.
-//  rotationY: koreksi arah hadap (radian). Model harus menghadap +Z.
-//  walkClip : nama/urutan klip animasi jalan (Mixamo: 0). Diputar hanya
-//             saat kesatria bergerak; root motion dibuang otomatis.
-//  idleUrl  : file animasi diam (Mixamo, boleh "Without Skin"). null = tanpa idle.
-//  walkUrl  : file animasi jalan terpisah (opsional). null = pakai klip dari `url`.
-//  walkSteps: jumlah langkah (petak) dalam satu klip jalan. Siklus jalan Mixamo = 2,
-//             animasi satu langkah (mis. "Long Step Forward") = 1 -> diputar dari awal tiap petak.
-// ============================================================
-//  idleClip / jumpClip: nama klip idle / lompat di dalam file `url` (opsional).
-//  includesPrincess: true bila putri sudah ada di dalam model -> putri bentuk dasar disembunyikan.
-// Model kesatria + putri digendong: dimodelkan, di-rig & dianimasikan oleh tim (Ilyas Saputra).
-const KNIGHT_MODEL = {
-  url: 'MainKnightRig.glb', walkClip: 'Walk', walkSteps: 2, idleClip: 'Idle', jumpClip: 'Jump',
-  walkUrl: null, idleUrl: null, includesPrincess: true,
-  height: 1.25, rotationY: 0, yOffset: 0,
-};
-const PRINCESS_MODEL = { url: null, height: 0.35, rotationY: 0, offset: [0, 0.62, -0.24] };
-const MONSTER_MODEL = { url: null, height: 0.9, rotationY: 0, yOffset: 0 };
-const GOLEM_MODEL = { url: null, height: 1.1, rotationY: 0, yOffset: 0 };
+// Konfigurasi model 3D & tekstur papan berada di js/assets-config.js
+const KNIGHT_MODEL = MODELS.knight;
+const PRINCESS_MODEL = MODELS.princess;
+const MONSTER_MODEL = MODELS.monster;
+const GOLEM_MODEL = MODELS.golem;
 
 const H = 0.5; // tinggi lantai
 
@@ -126,10 +108,51 @@ const key = (x, z) => `${x},${z}`;
 const std = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.9, ...extra });
 const lighten = (hex, l) => new THREE.Color(hex).offsetHSL(0, 0, l);
 
+const textureLoader = new THREE.TextureLoader();
+const texCache = new Map();
+const cachedTextures = new Set();
+
+function resolveTexSlot(spec) {
+  if (!spec) return null;
+  if (typeof spec === 'string') return { url: spec };
+  return spec.url ? spec : null;
+}
+
+function loadBoardTexture(spec) {
+  const { url, repeat } = spec;
+  const cacheKey = `${url}|${Array.isArray(repeat) ? repeat.join(',') : ''}`;
+  if (!texCache.has(cacheKey)) {
+    const tex = textureLoader.load(
+      url,
+      undefined,
+      undefined,
+      (err) => console.error('Gagal memuat tekstur papan:', url, err),
+    );
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    if (Array.isArray(repeat)) tex.repeat.set(repeat[0] ?? 1, repeat[1] ?? 1);
+    cachedTextures.add(tex);
+    texCache.set(cacheKey, tex);
+  }
+  return texCache.get(cacheKey);
+}
+
+function texturedStd(fallbackColor, texSpec, extra = {}) {
+  const slot = resolveTexSlot(texSpec);
+  if (!slot) return std(fallbackColor, extra);
+  const map = loadBoardTexture(slot);
+  const color = slot.tint === 'theme' ? fallbackColor : (slot.tint ?? 0xffffff);
+  return std(color, { ...extra, map });
+}
+
 function disposeGroup(g) {
   g.traverse((o) => {
     if (o.geometry) o.geometry.dispose();
-    if (o.material) [].concat(o.material).forEach((m) => { m.map?.dispose(); m.dispose(); });
+    if (o.material) [].concat(o.material).forEach((m) => {
+      if (m.map && m.map !== zzTexture && !cachedTextures.has(m.map)) m.map.dispose();
+      m.dispose();
+    });
   });
   g.clear();
 }
@@ -147,20 +170,23 @@ function getZzTexture() {
   return zzTexture;
 }
 
+let boardGen = 0;
 function buildBoard({ resetCamera = true } = {}) {
+  boardGen++;
   disposeGroup(board);
   parts.bridges.clear(); parts.gates.clear(); parts.levers.clear(); parts.spikes.clear(); parts.monsters = [];
 
   const th = stage.theme;
+  const tx = { ...TEXTURES.default, ...(TEXTURES.stages?.[stage.id] || {}) };
   const { W, D, cells } = world.def;
-  const topM = std(lighten(th.top, 0)), sideM = std(th.side);
-  const wallTop = std(lighten(th.wall, 0.08)), wallSide = std(th.wall);
+  const topM = texturedStd(lighten(th.top, 0), tx.floor), sideM = texturedStd(th.side, tx.floorSide);
+  const wallTop = texturedStd(lighten(th.wall, 0.08), tx.wallTop), wallSide = texturedStd(th.wall, tx.wall);
   const edgeM = new THREE.LineBasicMaterial({ color: lighten(th.top, 0.18), transparent: true, opacity: 0.4 });
-  const waterM = std(th.river || '#2d6cdf', { emissive: th.river || '#2d6cdf', emissiveIntensity: 0.18, transparent: true, opacity: 0.85, roughness: 0.3 });
+  const waterM = texturedStd(th.river || '#2d6cdf', tx.water, { emissive: th.river || '#2d6cdf', emissiveIntensity: 0.18, transparent: true, opacity: 0.85, roughness: 0.3 });
   const bedM = std(lighten(th.side, -0.05));
-  const metalM = std(0xc8ccd2, { metalness: 0.7, roughness: 0.35 });
-  const woodM = std(0x8a5a2b);
-  const goldM = std(0xe0b04a, { metalness: 0.6, roughness: 0.4 });
+  const metalM = texturedStd(0xc8ccd2, tx.metal, { metalness: 0.7, roughness: 0.35 });
+  const woodM = texturedStd(0x8a5a2b, tx.wood);
+  const goldM = texturedStd(0xe0b04a, tx.gold, { metalness: 0.6, roughness: 0.4 });
 
   const tileGeo = new THREE.BoxGeometry(1, H, 1);
   const tileEdges = new THREE.EdgesGeometry(tileGeo);
@@ -269,7 +295,8 @@ function buildBoard({ resetCamera = true } = {}) {
         g.position.set(wx + 0.28, H, wz - 0.28);
         g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
         board.add(g);
-        parts.levers.set(c.lever, pivot);
+        if (!parts.levers.has(c.lever)) parts.levers.set(c.lever, []);
+        parts.levers.get(c.lever).push(pivot);
       }
       if (c.exit) {
         const g = new THREE.Group();
@@ -347,6 +374,7 @@ function buildKnight() {
   shield.position.set(0.24, 0.42, 0.05);
   g.add(body, band, plume, shield);
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  g.userData.isPlaceholder = true;
   return g;
 }
 
@@ -360,7 +388,8 @@ function buildPrincess() {
   g.add(dress, head, crown);
   // Sengaja TIDAK memberi bayangan: petunjuk halus plot twist.
   g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
-  g.position.set(...PRINCESS_MODEL.offset);
+  g.position.set(...(PRINCESS_MODEL.offset ?? [0, 0.62, -0.24]));
+  g.userData.isPlaceholder = true;
   return g;
 }
 
@@ -477,6 +506,7 @@ let walkRate = 0; // 0 = diam, >0 = kecepatan animasi jalan
 let idleAction = null;
 let walkW = 0; // bobot campuran jalan (0 = idle penuh, 1 = jalan penuh)
 let princessObj = buildPrincess();
+let knightHasEmbeddedPrincess = false;
 function setKnightObject(obj, { withPrincess = true } = {}) {
   knightBody.clear();
   knightBody.add(obj);
@@ -484,82 +514,148 @@ function setKnightObject(obj, { withPrincess = true } = {}) {
 }
 setKnightObject(buildKnight());
 
-async function applyCustomModels() {
+function findClip(anims, selector) {
+  if (!Array.isArray(anims) || anims.length === 0) return null;
+  if (typeof selector === 'string') return anims.find((a) => a.name === selector) ?? null;
+  if (typeof selector === 'number') return anims[selector] ?? null;
+  return null;
+}
+
+function syncPrincessAttachment() {
+  knightBody.remove(princessObj);
+  if (!knightHasEmbeddedPrincess) knightBody.add(princessObj);
+}
+
+let knightModelGen = 0;
+let princessModelGen = 0;
+
+async function applyKnightModel() {
+  const gen = ++knightModelGen;
+  if (!KNIGHT_MODEL.url) {
+    knightHasEmbeddedPrincess = false;
+    mixer = null; walkAction = null; idleAction = null; jumpAction = null; moveAction = null; walkW = 0;
+    setKnightObject(buildKnight(), { withPrincess: true });
+    return;
+  }
   try {
-    if (KNIGHT_MODEL.url) {
-      const { wrap, model, animations } = await loadModel(KNIGHT_MODEL);
-      knightMats.length = 0;
-      model.traverse((o) => {
-        if (o.isMesh) for (const m of [].concat(o.material)) if (m.emissive) knightMats.push(m);
-      });
-      setKnightObject(wrap, { withPrincess: !KNIGHT_MODEL.includesPrincess });
-      mixer = null; walkAction = null; idleAction = null; jumpAction = null; moveAction = null; walkW = 0;
-      let walkAnims = animations;
-      if (KNIGHT_MODEL.walkUrl) {
-        try { walkAnims = (await loadRaw(KNIGHT_MODEL.walkUrl)).animations; }
-        catch (e) { console.error('Gagal memuat animasi jalan, pakai klip bawaan model:', e); }
-      }
-      const clip = typeof KNIGHT_MODEL.walkClip === 'string'
-        ? walkAnims.find((a) => a.name === KNIGHT_MODEL.walkClip)
-        : walkAnims[KNIGHT_MODEL.walkClip ?? 0];
-      if (clip) {
-        mixer = new THREE.AnimationMixer(model);
-        walkAction = mixer.clipAction(stripRootMotion(clip));
-        walkAction.play();
-      }
-      const byName = (name) => name && animations.find((a) => a.name === name);
-      const idleOwn = !KNIGHT_MODEL.idleUrl && byName(KNIGHT_MODEL.idleClip);
-      if (idleOwn) {
-        mixer ??= new THREE.AnimationMixer(model);
-        idleAction = mixer.clipAction(stripRootMotion(idleOwn));
-        idleAction.play();
-        walkAction?.setEffectiveWeight(0);
-      }
-      const jumpOwn = byName(KNIGHT_MODEL.jumpClip);
-      if (jumpOwn && mixer) {
-        jumpAction = mixer.clipAction(stripRootMotion(jumpOwn));
-        // sekali putar per perintah Lompat, lalu tertahan di pose mendarat
-        jumpAction.setLoop(THREE.LoopOnce, 1);
-        jumpAction.clampWhenFinished = true;
-        jumpAction.setEffectiveWeight(0);
-      }
-      if (KNIGHT_MODEL.idleUrl) {
-        try {
-          const idleClip = (await loadRaw(KNIGHT_MODEL.idleUrl)).animations[0];
-          if (idleClip) {
-            mixer ??= new THREE.AnimationMixer(model);
-            idleAction = mixer.clipAction(stripRootMotion(idleClip));
-            idleAction.play();
-            walkAction?.setEffectiveWeight(0);
-          }
-        } catch (e) { console.error('Gagal memuat animasi idle:', e); }
-      }
-      mixer?.update(0);
+    const { wrap, model, animations } = await loadModel(KNIGHT_MODEL);
+    if (gen !== knightModelGen) return;
+
+    let walkAnims = animations;
+    if (KNIGHT_MODEL.walkUrl) {
+      try { walkAnims = (await loadRaw(KNIGHT_MODEL.walkUrl)).animations; }
+      catch (e) { console.error('Gagal memuat animasi jalan, pakai klip bawaan model:', e); }
+      if (gen !== knightModelGen) return;
     }
-    if (PRINCESS_MODEL.url) {
-      const { wrap } = await loadModel(PRINCESS_MODEL);
-      wrap.traverse((o) => { if (o.isMesh) o.castShadow = false; });
-      wrap.position.set(...PRINCESS_MODEL.offset);
-      knightBody.remove(princessObj);
-      princessObj = wrap;
-      knightBody.add(princessObj);
+
+    let idleClip = null;
+    if (KNIGHT_MODEL.idleUrl) {
+      try {
+        const idleAnims = (await loadRaw(KNIGHT_MODEL.idleUrl)).animations;
+        idleClip = findClip(idleAnims, KNIGHT_MODEL.idleClip ?? 0);
+      } catch (e) { console.error('Gagal memuat animasi idle:', e); }
+      if (gen !== knightModelGen) return;
     }
+
+    knightMats.length = 0;
+    model.traverse((o) => {
+      if (o.isMesh) for (const m of [].concat(o.material)) if (m.emissive) knightMats.push(m);
+    });
+    knightHasEmbeddedPrincess = !!KNIGHT_MODEL.includesPrincess;
+    setKnightObject(wrap, { withPrincess: !knightHasEmbeddedPrincess });
+    mixer = null; walkAction = null; idleAction = null; jumpAction = null; moveAction = null; walkW = 0;
+
+    const clip = findClip(walkAnims, KNIGHT_MODEL.walkClip ?? 0);
+    if (clip) {
+      mixer = new THREE.AnimationMixer(model);
+      walkAction = mixer.clipAction(stripRootMotion(clip));
+      walkAction.play();
+    }
+    if (!idleClip && KNIGHT_MODEL.idleClip != null) {
+      const candidate = findClip(animations, KNIGHT_MODEL.idleClip);
+      if (candidate && candidate !== clip) idleClip = candidate;
+    }
+    if (idleClip) {
+      mixer ??= new THREE.AnimationMixer(model);
+      idleAction = mixer.clipAction(stripRootMotion(idleClip));
+      idleAction.play();
+      walkAction?.setEffectiveWeight(0);
+    }
+    const jumpClipObj = findClip(animations, KNIGHT_MODEL.jumpClip);
+    if (jumpClipObj) {
+      mixer ??= new THREE.AnimationMixer(model);
+      jumpAction = mixer.clipAction(stripRootMotion(jumpClipObj));
+      // sekali putar per perintah Lompat, lalu tertahan di pose mendarat
+      jumpAction.setLoop(THREE.LoopOnce, 1);
+      jumpAction.clampWhenFinished = true;
+      jumpAction.setEffectiveWeight(0);
+    }
+    mixer?.update(0);
   } catch (e) {
-    console.error('Gagal memuat model:', e);
-    showToast('Model 3D gagal dimuat, memakai kapsul');
+    console.error('Gagal memuat model kesatria:', e);
+    showToast('Model kesatria gagal dimuat, memakai placeholder');
   }
 }
+
+async function applyPrincessModel() {
+  const gen = ++princessModelGen;
+  if (!PRINCESS_MODEL.url) {
+    if (!princessObj.userData?.isPlaceholder) {
+      knightBody.remove(princessObj);
+      princessObj = buildPrincess();
+    }
+    syncPrincessAttachment();
+    return;
+  }
+  try {
+    const { wrap } = await loadModel(PRINCESS_MODEL);
+    if (gen !== princessModelGen) return;
+    // Sengaja TIDAK memberi bayangan: petunjuk halus plot twist.
+    wrap.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+    wrap.position.set(...(PRINCESS_MODEL.offset ?? [0, 0.62, -0.24]));
+    knightBody.remove(princessObj);
+    princessObj = wrap;
+    syncPrincessAttachment();
+  } catch (e) {
+    console.error('Gagal memuat model putri:', e);
+    showToast('Model putri gagal dimuat, memakai placeholder');
+  }
+}
+
+async function applyCustomModels() {
+  await Promise.all([applyKnightModel(), applyPrincessModel()]);
+}
 applyCustomModels();
-// Dari console: setKnightModel({ url: 'models/knight.glb', scale: 0.5 })
-window.setKnightModel = async (cfg) => { Object.assign(KNIGHT_MODEL, cfg); await applyCustomModels(); };
+// Dari console:
+//   setKnightModel({ url: 'assets/models/knight.glb', walkClip: 'Walk', idleClip: 'Idle', jumpClip: 'Jump', includesPrincess: true })
+//   setPrincessModel({ url: 'assets/models/princess.glb', height: 0.35, offset: [0, 0.62, -0.24] })
+//   setMonsterModel({ url: 'assets/models/monster.glb', height: 0.9 })
+//   setGolemModel({ url: 'assets/models/golem.glb', height: 1.1 })
+//   setBoardTextures({ floor: 'assets/textures/floor.png' })
+window.setKnightModel = async (cfg) => { Object.assign(KNIGHT_MODEL, cfg); await applyKnightModel(); };
+window.setPrincessModel = async (cfg) => { Object.assign(PRINCESS_MODEL, cfg); await applyPrincessModel(); };
+window.setMonsterModel = async (cfg) => { Object.assign(MONSTER_MODEL, cfg); buildBoard({ resetCamera: false }); syncWorld(true); await applyMonsterModels(); };
+window.setGolemModel = async (cfg) => { Object.assign(GOLEM_MODEL, cfg); buildBoard({ resetCamera: false }); syncWorld(true); await applyMonsterModels(); };
+window.setBoardTextures = async (patch, stageId = null) => {
+  if (stageId != null) {
+    TEXTURES.stages[stageId] = { ...(TEXTURES.stages[stageId] || {}), ...patch };
+  } else {
+    Object.assign(TEXTURES.default, patch);
+  }
+  buildBoard({ resetCamera: false });
+  syncWorld(true);
+  await applyMonsterModels();
+};
 
 // Monster/golem custom: dipasang ulang tiap board dibangun.
 async function applyMonsterModels() {
   const cfg = stage.monsterKind === 'golem' ? GOLEM_MODEL : MONSTER_MODEL;
   if (!cfg.url) return;
+  const gen = boardGen;
   try {
     for (const a of parts.monsters) {
       const { wrap } = await loadModel(cfg);
+      if (gen !== boardGen) return;
       const keep = a.body.children.filter((c) => c.material === a.eyeM);
       a.body.clear();
       a.body.add(wrap, ...keep.map((k) => { k.visible = false; return k; }));
@@ -598,7 +694,7 @@ function syncWorld(instant = false) {
     g.userData.target = world.active.has(id) ? g.userData.yOpen : g.userData.yClosed;
     if (instant) g.position.y = g.userData.target;
   }
-  for (const [id, pivot] of parts.levers) {
+  for (const [id, list] of parts.levers) for (const pivot of list) {
     pivot.userData.target = world.active.has(id) ? -0.6 : 0.6;
     if (instant) pivot.rotation.z = pivot.userData.target;
   }
@@ -654,7 +750,7 @@ renderer.setAnimationLoop(() => {
     if (o.userData.target !== undefined) o.position.y += (o.userData.target - o.position.y) * f;
     if (o.userData.water) o.position.y = 0.28 + Math.sin(t * 2 + o.position.x + o.position.z) * 0.015;
   });
-  for (const p of parts.levers.values()) p.rotation.z += (p.userData.target - p.rotation.z) * f;
+  for (const list of parts.levers.values()) for (const p of list) p.rotation.z += (p.userData.target - p.rotation.z) * f;
   lantern.position.set(knight.position.x, knight.position.y + 1.1, knight.position.z);
   controls.update();
   renderer.render(scene, camera);
@@ -787,7 +883,7 @@ async function animateEvent(ev, token) {
       break;
     }
     case 'caught': {
-      await travel(ev, token);
+      if (ev.from.x !== ev.to.x || ev.from.z !== ev.to.z) await travel(ev, token);
       sfx('caught');
       const a = parts.monsters[ev.monster];
       await tween(dur(480), (t) => {
@@ -807,7 +903,11 @@ async function animateEvent(ev, token) {
 // ------------------------------------------------------------
 let muted = false;
 let actx = null;
-const audio = () => (actx ??= new (window.AudioContext || window.webkitAudioContext)());
+const audio = () => {
+  actx ??= new (window.AudioContext || window.webkitAudioContext)();
+  if (actx.state === 'suspended') actx.resume().catch(() => {});
+  return actx;
+};
 
 // file: nama file di assets/sfx, gain: volume dasar, rate: kecepatan putar (mengubah nada)
 const SAMPLES = {
@@ -919,11 +1019,12 @@ const personalize = (text) => String(text).replaceAll('{pemain}', playerName());
 const stats = { runs: 0, wins: 0, fails: 0, ...load('stats', {}) };
 const bumpStat = (k) => { stats[k] = (stats[k] || 0) + 1; store('stats', stats); };
 
-const settings = { text: 'm', music: 60, sfx: 80, contrast: false, motion: false, bgfx: true, ...load('settings', {}) };
+const settings = { text: 'm', music: 60, sfx: 80, contrast: false, readable: false, motion: false, bgfx: true, ...load('settings', {}) };
 const TEXT_SCALE = { s: 0.9, m: 1, l: 1.15, xl: 1.3 };
 function applySettings() {
   document.documentElement.style.setProperty('--fs', TEXT_SCALE[settings.text] || 1);
   document.body.classList.toggle('hc', !!settings.contrast);
+  document.body.classList.toggle('rf', !!settings.readable);
   document.body.classList.toggle('rm', !!settings.motion);
   bgfx.setEnabled(settings.bgfx !== false);
   requestAnimationFrame(resize);
@@ -2270,7 +2371,6 @@ function switchToSlot(s) {
   reloadProfileState();
   goToMenu(); // kembali ke sampul dengan profil yang baru dimuat
   loadStage(Math.min(load('last', 0), progress().unlocked - 1), { intro: false });
-document.body.classList.remove('booting'); // layar muat selesai
 }
 
 // mode: 'load' (muat/ganti) atau 'new' (pilih slot untuk profil baru)
@@ -2428,6 +2528,7 @@ function openSettings() {
   document.getElementById('setMusic').value = settings.music;
   document.getElementById('setSfx').value = settings.sfx;
   document.getElementById('setContrast').checked = settings.contrast;
+  document.getElementById('setReadable').checked = !!settings.readable;
   document.getElementById('setMotion').checked = settings.motion;
   document.getElementById('setBgfx').checked = settings.bgfx !== false;
   settingsOverlay.hidden = false;
@@ -2458,6 +2559,7 @@ document.getElementById('setMusic').oninput = (e) => { settings.music = +e.targe
 document.getElementById('setSfx').oninput = (e) => { settings.sfx = +e.target.value; saveSettings(); };
 document.getElementById('setSfx').onchange = () => sfx('click');
 document.getElementById('setContrast').onchange = (e) => { settings.contrast = e.target.checked; saveSettings(); };
+document.getElementById('setReadable').onchange = (e) => { settings.readable = e.target.checked; saveSettings(); };
 document.getElementById('setMotion').onchange = (e) => { settings.motion = e.target.checked; saveSettings(); };
 document.getElementById('setBgfx').onchange = (e) => { settings.bgfx = e.target.checked; saveSettings(); };
 document.getElementById('btnTitleSettings').onclick = openSettings;

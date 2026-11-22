@@ -32,7 +32,7 @@ def collect():
         for base, _, names in os.walk(os.path.join(ROOT, d)):
             for n in names:
                 rel = os.path.relpath(os.path.join(base, n), ROOT).replace(os.sep, '/')
-                if rel not in SKIP:
+                if rel not in SKIP and not (d == 'assets' and n.lower().endswith('.md')):
                     paths.append(rel)
     missing = [p for p in paths if not os.path.isfile(os.path.join(ROOT, p))]
     if missing:

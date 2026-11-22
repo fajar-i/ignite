@@ -11,7 +11,7 @@ File di folder ini dibuat dari aset game (`python tools/make_itch_art.py`).
 
 ## 1. Edit game
 - **Kind of project:** HTML
-- **Uploads:** `dist/mata-sang-kesatria-web.zip` (buat ulang dengan `python tools/build_web.py`), centang **This file will be played in the browser**
+- **Uploads:** `dist/eyes-for-the-nameless-web.zip` (buat ulang dengan `python tools/build_web.py`), centang **This file will be played in the browser**
 - **Embed options:**
   - Viewport dimensions: **1280 × 720**
   - Centang **Fullscreen button**
