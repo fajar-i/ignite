@@ -46,12 +46,59 @@ const bgfx = createBackground(viewport, { reducedMotion: () => document.body.cla
 const scene = new THREE.Scene();
 const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.enablePan = false;
+controls.enablePan = true;
+controls.screenSpacePanning = false;
+controls.panSpeed = 0.85;
 controls.enableDamping = true;
 controls.minZoom = 0.6;
 controls.maxZoom = 3;
 controls.minPolarAngle = 0.25;
 controls.maxPolarAngle = Math.PI * 0.42;
+
+const CAM_DEFAULT_TARGET = new THREE.Vector3(0, 0.4, 0);
+const CAM_DEFAULT_POS = new THREE.Vector3(10, 10, 10);
+const CAM_DEFAULT_ZOOM = 1;
+let panBounds = { x: 3.5, z: 3.5 };
+let camResetAnim = null;
+const camKeys = new Set();
+const _camFwd = new THREE.Vector3();
+const _camRight = new THREE.Vector3();
+const _camUp = new THREE.Vector3(0, 1, 0);
+
+function clampCameraTarget() {
+  const tx = THREE.MathUtils.clamp(controls.target.x, -panBounds.x, panBounds.x);
+  const ty = CAM_DEFAULT_TARGET.y;
+  const tz = THREE.MathUtils.clamp(controls.target.z, -panBounds.z, panBounds.z);
+  const dx = tx - controls.target.x;
+  const dy = ty - controls.target.y;
+  const dz = tz - controls.target.z;
+  if (dx || dy || dz) {
+    controls.target.set(tx, ty, tz);
+    camera.position.x += dx;
+    camera.position.y += dy;
+    camera.position.z += dz;
+  }
+}
+
+function resetCameraView({ instant = false } = {}) {
+  if (instant || document.body.classList.contains('rm')) {
+    camResetAnim = null;
+    controls.target.copy(CAM_DEFAULT_TARGET);
+    camera.position.copy(CAM_DEFAULT_POS);
+    camera.zoom = CAM_DEFAULT_ZOOM;
+    camera.updateProjectionMatrix();
+    controls.update();
+    return;
+  }
+  camResetAnim = {
+    elapsed: 0,
+    duration: 0.35,
+    fromTarget: controls.target.clone(),
+    fromPos: camera.position.clone(),
+    fromZoom: camera.zoom,
+  };
+}
+controls.addEventListener('start', () => { camResetAnim = null; });
 
 const hemi = new THREE.HemisphereLight(0xd8f0ee, 0x0a1d20, 1.2);
 scene.add(hemi);
@@ -148,6 +195,7 @@ function texturedStd(fallbackColor, texSpec, extra = {}) {
 
 function disposeGroup(g) {
   g.traverse((o) => {
+    if (o.userData?.fromModelCache) return;
     if (o.geometry) o.geometry.dispose();
     if (o.material) [].concat(o.material).forEach((m) => {
       if (m.map && m.map !== zzTexture && !cachedTextures.has(m.map)) m.map.dispose();
@@ -341,10 +389,11 @@ function buildBoard({ resetCamera = true } = {}) {
 
   const s = W + D;
   fit = { hw: s * 0.38 + 0.4, hh: s * 0.23 + 1.0 };
+  panBounds = { x: Math.max(1.5, W / 2 - 0.2), z: Math.max(1.5, D / 2 - 0.2) };
   if (resetCamera) {
-    controls.target.set(0, 0.4, 0);
-    camera.position.set(10, 10, 10);
-    camera.zoom = 1;
+    resetCameraView({ instant: true });
+  } else {
+    clampCameraTarget();
   }
   camera.updateProjectionMatrix();
   resize();
@@ -468,6 +517,7 @@ async function loadModel(cfg) {
   const raw = await loadRaw(cfg.url);
   const model = cloneSkinned(raw.scene);
   model.traverse((o) => {
+    o.userData.fromModelCache = true;
     if (!o.isMesh) return;
     o.castShadow = true;
     o.receiveShadow = true;
@@ -654,6 +704,40 @@ window.setBoardTextures = async (patch, stageId = null) => {
   await applyMonsterModels();
 };
 
+function setActorAnim(a, asleep, instant = false) {
+  if (!a?.anim) return;
+  const { mixer: mMixer, actions, blend } = a.anim;
+  const prev = a.anim.asleep;
+  a.anim.asleep = asleep;
+  if (instant) {
+    a.anim.attacking = false;
+    const target = (asleep ? actions.sleep : actions.idle) || actions.idle || actions.sleep;
+    a.anim.active = target;
+    for (const act of Object.values(actions)) {
+      if (!act) continue;
+      if (act === target) { act.reset().play(); act.setEffectiveWeight(1); blend.set(act, 1); }
+      else { act.setEffectiveWeight(0); blend.set(act, 0); }
+    }
+    mMixer.update(0);
+    return;
+  }
+  if (a.anim.attacking || prev === asleep) return;
+  if (asleep) {
+    if (actions.toSleep) { actions.toSleep.reset().play(); a.anim.active = actions.toSleep; }
+    else if (actions.sleep) { actions.sleep.play(); a.anim.active = actions.sleep; }
+  } else {
+    if (actions.toIdle) { actions.toIdle.reset().play(); a.anim.active = actions.toIdle; }
+    else if (actions.idle) { actions.idle.play(); a.anim.active = actions.idle; }
+  }
+}
+
+function playActorAttack(a) {
+  if (!a?.anim?.actions.attack) return;
+  a.anim.attacking = true;
+  a.anim.actions.attack.reset().play();
+  a.anim.active = a.anim.actions.attack;
+}
+
 // Monster/golem custom: dipasang ulang tiap board dibangun.
 async function applyMonsterModels() {
   const cfg = stage.monsterKind === 'golem' ? GOLEM_MODEL : MONSTER_MODEL;
@@ -661,11 +745,46 @@ async function applyMonsterModels() {
   const gen = boardGen;
   try {
     for (const a of parts.monsters) {
-      const { wrap } = await loadModel(cfg);
+      const { wrap, model, animations } = await loadModel(cfg);
       if (gen !== boardGen) return;
       const keep = a.body.children.filter((c) => c.material === a.eyeM);
       a.body.clear();
       a.body.add(wrap, ...keep.map((k) => { k.visible = false; return k; }));
+
+      const clips = {
+        idle: findClip(animations, cfg.idleClip),
+        sleep: findClip(animations, cfg.sleepClip),
+        toSleep: findClip(animations, cfg.toSleepClip),
+        toIdle: findClip(animations, cfg.toIdleClip),
+        attack: findClip(animations, cfg.attackClip),
+      };
+      if (Object.values(clips).some(Boolean)) {
+        const mMixer = new THREE.AnimationMixer(model);
+        const mkAction = (c, once = false) => {
+          if (!c) return null;
+          const act = mMixer.clipAction(c);
+          if (once) {
+            act.setLoop(THREE.LoopOnce, 1);
+            act.clampWhenFinished = true;
+          }
+          act.play();
+          act.setEffectiveWeight(0);
+          return act;
+        };
+        const actions = {
+          idle: mkAction(clips.idle, false),
+          sleep: mkAction(clips.sleep, false),
+          toSleep: mkAction(clips.toSleep, true),
+          toIdle: mkAction(clips.toIdle, true),
+          attack: mkAction(clips.attack, true),
+        };
+        a.anim = { mixer: mMixer, actions, active: null, asleep: null, attacking: false, blend: new Map() };
+        a.body.rotation.z = 0;
+        a.body.position.y = 0;
+        setActorAnim(a, a.target === 1, true);
+      } else {
+        a.anim = null;
+      }
     }
   } catch (e) { console.error('Gagal memuat model monster:', e); }
 }
@@ -690,8 +809,10 @@ function syncWorld(instant = false) {
   world.monsters.forEach((m, i) => {
     const a = parts.monsters[i];
     if (!a) return;
-    a.target = world.asleep(m) ? 1 : 0;
+    const asleep = world.asleep(m);
+    a.target = asleep ? 1 : 0;
     if (instant) a.k = a.target;
+    setActorAnim(a, asleep, instant);
   });
   for (const [id, list] of parts.bridges) for (const p of list) {
     p.userData.target = world.active.has(id) ? p.userData.yOpen : p.userData.yClosed;
@@ -874,11 +995,42 @@ renderer.setAnimationLoop(() => {
       mixer.update(dt);
     } else if (walkRate > 0) mixer.update(dt * walkRate);
   }
+  const gSpeed = Math.max(1, SPEEDS[+speedEl.value - 1] * 0.85);
+  const gBlend = 1 - Math.exp(-dt * 14);
   for (const a of parts.monsters) {
     a.k += (a.target - a.k) * f;
-    a.body.rotation.z = a.k * 1.35;
-    a.body.position.y = -a.k * 0.12 + (1 - a.k) * Math.abs(Math.sin(t * 3)) * 0.03;
-    a.body.position.z = a.lunge;
+    if (a.anim) {
+      const { mixer: mMixer, actions, blend } = a.anim;
+      a.body.rotation.z = 0;
+      a.body.position.y = 0;
+      a.body.position.z = actions.attack ? 0 : a.lunge;
+      for (const act of Object.values(actions)) {
+        if (!act) continue;
+        const isOneShot = act === actions.toSleep || act === actions.toIdle || act === actions.attack;
+        const w0 = blend.get(act) ?? 0;
+        const w = w0 + ((act === a.anim.active ? 1 : 0) - w0) * gBlend;
+        blend.set(act, w);
+        act.setEffectiveWeight(w);
+        act.setEffectiveTimeScale(isOneShot ? gSpeed : 1);
+      }
+      mMixer.update(dt);
+      const done = (act) => act && act.time >= act.getClip().duration - 0.03;
+      if (a.anim.attacking && done(actions.attack)) {
+        a.anim.attacking = false;
+        const next = (a.anim.asleep ? actions.sleep : actions.idle) || actions.idle || actions.sleep;
+        if (next) { next.play(); a.anim.active = next; }
+      } else if (a.anim.active === actions.toSleep && done(actions.toSleep)) {
+        const next = (a.anim.asleep ? actions.sleep : actions.idle) || actions.idle;
+        if (next) { next.play(); a.anim.active = next; }
+      } else if (a.anim.active === actions.toIdle && done(actions.toIdle)) {
+        const next = (!a.anim.asleep ? actions.idle : actions.sleep) || actions.sleep;
+        if (next) { next.play(); a.anim.active = next; }
+      }
+    } else {
+      a.body.rotation.z = a.k * 1.35;
+      a.body.position.y = -a.k * 0.12 + (1 - a.k) * Math.abs(Math.sin(t * 3)) * 0.03;
+      a.body.position.z = a.lunge;
+    }
     a.eyeM.emissiveIntensity = (1 - a.k) * 2.2;
     a.zz.visible = a.k > 0.6;
     a.zz.position.x = Math.sin(t * 2) * 0.05;
@@ -890,7 +1042,37 @@ renderer.setAnimationLoop(() => {
   });
   for (const list of parts.levers.values()) for (const p of list) p.rotation.z += (p.userData.target - p.rotation.z) * f;
   lantern.position.set(knight.position.x, knight.position.y + 1.1, knight.position.z);
+  if (camResetAnim) {
+    camResetAnim.elapsed += dt;
+    const u = ease(Math.min(1, camResetAnim.elapsed / camResetAnim.duration));
+    controls.target.lerpVectors(camResetAnim.fromTarget, CAM_DEFAULT_TARGET, u);
+    camera.position.lerpVectors(camResetAnim.fromPos, CAM_DEFAULT_POS, u);
+    camera.zoom = lerp(camResetAnim.fromZoom, CAM_DEFAULT_ZOOM, u);
+    camera.updateProjectionMatrix();
+    if (u >= 1) camResetAnim = null;
+  } else if (camKeys.size > 0) {
+    if (!titleEl.hidden || editing || anyOverlayOpen()) {
+      camKeys.clear();
+    } else {
+      _camFwd.set(controls.target.x - camera.position.x, 0, controls.target.z - camera.position.z);
+      if (_camFwd.lengthSq() > 1e-6) {
+        _camFwd.normalize();
+        _camRight.crossVectors(_camFwd, _camUp).normalize();
+        const fMove = (camKeys.has('w') ? 1 : 0) - (camKeys.has('s') ? 1 : 0);
+        const rMove = (camKeys.has('d') ? 1 : 0) - (camKeys.has('a') ? 1 : 0);
+        if (fMove || rMove) {
+          const len = Math.hypot(fMove, rMove);
+          const step = (6.5 / camera.zoom) * dt / len;
+          const dx = (_camFwd.x * fMove + _camRight.x * rMove) * step;
+          const dz = (_camFwd.z * fMove + _camRight.z * rMove) * step;
+          controls.target.x += dx; controls.target.z += dz;
+          camera.position.x += dx; camera.position.z += dz;
+        }
+      }
+    }
+  }
   controls.update();
+  clampCameraTarget();
   renderer.render(scene, camera);
 });
 
@@ -1033,6 +1215,7 @@ async function animateEvent(ev, token) {
       if (ev.from.x !== ev.to.x || ev.from.z !== ev.to.z) await travel(ev, token);
       sfx('caught');
       const a = parts.monsters[ev.monster];
+      playActorAttack(a);
       await tween(dur(480), (t) => {
         if (a) a.lunge = Math.sin(Math.PI * t) * 0.25;
         setKnightFlash(Math.sin(Math.PI * t) * 0.8);
@@ -2880,6 +3063,19 @@ function goToMenu() {
 const isOpen = (id) => !document.getElementById(id).hidden;
 const overlays = [...document.querySelectorAll('.overlay')];
 const anyOverlayOpen = () => overlays.some((o) => !o.hidden);
+
+document.getElementById('btnCenterCam').onclick = () => { sfx('click'); resetCameraView(); };
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  const a = document.activeElement;
+  if (a && ['INPUT', 'SELECT', 'TEXTAREA'].includes(a.tagName)) return;
+  if (!titleEl.hidden || editing || anyOverlayOpen()) return;
+  const k = e.key.toLowerCase();
+  if (k === 'c') { e.preventDefault(); sfx('click'); resetCameraView(); }
+  else if (k.length === 1 && 'wasd'.includes(k)) { camResetAnim = null; camKeys.add(k); }
+});
+document.addEventListener('keyup', (e) => { camKeys.delete(e.key.toLowerCase()); });
+window.addEventListener('blur', () => { camKeys.clear(); });
 initUI({
   app: document.querySelector('.app'),
   overlays,

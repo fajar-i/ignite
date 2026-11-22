@@ -15,7 +15,7 @@ export const CREDITS = [
   {
     group: 'Karakter & animasi',
     items: [
-      { what: 'Model 3D kesatria & putri, rig, animasi diam/jalan/lompat', who: 'Ilyas Saputra (tim)', url: '', license: 'Karya tim' },
+      { what: 'Model 3D kesatria, putri & golem, rig, animasi diam/jalan/lompat/golem', who: 'Ilyas Saputra (tim)', url: '', license: 'Karya tim' },
       { what: 'Render diorama menu utama (kartu judul & kesatria)', who: 'Tim', url: '', license: 'Karya tim' },
     ],
   },

@@ -30,6 +30,13 @@
  * Properti tambahan khusus `princess`:
  * - offset    : posisi relatif [x, y, z] Putri di bahu/sekitar Kesatria jika dipasang terpisah.
  *               Catatan: bayangan Putri sengaja dinonaktifkan di engine (petunjuk halus plot twist).
+ *
+ * Properti tambahan opsional untuk `monster` / `golem`:
+ * - idleClip    : nama/indeks klip animasi siaga (loop).
+ * - sleepClip   : nama/indeks klip animasi tidur (loop).
+ * - toSleepClip : nama/indeks klip transisi siaga -> tidur (sekali putar).
+ * - toIdleClip  : nama/indeks klip transisi tidur -> siaga (sekali putar).
+ * - attackClip  : nama/indeks klip animasi menyerang saat menangkap kesatria (sekali putar).
  */
 export const MODELS = {
   // Model kesatria + putri digendong: dimodelkan, di-rig & dianimasikan oleh tim (Ilyas Saputra).
@@ -70,8 +77,14 @@ export const MODELS = {
     yOffset: 0,
   },
 
+  // Model 3D golem + rig & animasi: dimodelkan & dianimasikan oleh tim (Ilyas Saputra).
   golem: {
-    url: null, // Contoh: 'assets/models/golem.glb'
+    url: 'assets/models/golem.glb',
+    idleClip: 'GolemIdle',
+    sleepClip: 'GolemSleep',
+    toSleepClip: 'GolemToSleep',
+    toIdleClip: 'GolemToIdle',
+    attackClip: 'GolemAttack',
     height: 1.1,
     rotationX: 0,
     rotationY: 0,
