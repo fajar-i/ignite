@@ -38,6 +38,10 @@
 
   /* Tekstur kain: Smithsonian on Unsplash (lihat readme) */
   --noise: url("assets/paper.jpg");
+  /* Cara tekstur menyatu dengan warna --paper di bawahnya:
+     multiply/darken = serat gelap di area terang; screen/lighten = serat terang;
+     overlay/soft-light = kontras seimbang. */
+  --tex-blend: multiply;
   --title-font: "Cinzel", "Times New Roman", serif;
   --body-font: "Lora", Georgia, serif;
 }
@@ -61,7 +65,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* ---------- kertas ---------- */
 .paper {
   background-color: var(--paper);
-  background-image: var(--noise), radial-gradient(ellipse at 50% 40%, transparent 55%, #8a5a2a2e 100%);
+  background-image: var(--noise), radial-gradient(ellipse at 50% 40%, transparent 55%, #8a5a2a2e 100%); background-blend-mode: var(--tex-blend), normal;
   border: 1px solid var(--paper-edge);
   border-radius: 0.6rem;
   box-shadow: 0 0.1rem 0 #fff8 inset, 0 0.9rem 2.2rem #0009, 0 0 0 1px #2a1a0c55;
@@ -105,7 +109,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .icon-btn {
   width: 2.6rem; height: 2.6rem; border-radius: 50%; display: grid; place-items: center;
-  background: var(--paper); background-image: var(--noise); color: var(--ink);
+  background: var(--paper); background-image: var(--noise); background-blend-mode: var(--tex-blend); color: var(--ink);
   border: 1px solid var(--paper-edge); box-shadow: 0 3px 10px #0007, 0 0 0 1px #2a1a0c55;
 }
 .icon-btn:hover { color: var(--wax); }
@@ -126,8 +130,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
   display: flex; align-items: flex-start; gap: 0.75rem; pointer-events: none;
 }
 .topbar > * { pointer-events: auto; }
+.topbar > #btnHome { align-self: center; flex: none; }
 .banner {
-  background: var(--paper); background-image: var(--noise);
+  background: var(--paper); background-image: var(--noise); background-blend-mode: var(--tex-blend);
   border: 1px solid var(--paper-edge); border-radius: 0.5rem;
   padding: 0.45rem 1.1rem 0.5rem; box-shadow: 0 4px 14px #0008, 0 0 0 1px #2a1a0c55;
   flex: 0 1 auto; min-width: 9rem; max-width: 18rem;
@@ -155,7 +160,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .hint-btn {
   position: absolute; left: calc(var(--gap) + var(--sa-l)); bottom: calc(var(--gap) + var(--sa-b));
   display: flex; align-items: center; gap: 0.5rem;
-  background: var(--paper); background-image: var(--noise);
+  background: var(--paper); background-image: var(--noise); background-blend-mode: var(--tex-blend);
   border: 1px solid var(--paper-edge); border-radius: 999px;
   padding: 0.3rem 1rem 0.3rem 0.3rem; font-weight: 700; font-size: 0.9rem;
   box-shadow: 0 4px 14px #0008;
@@ -180,7 +185,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   position: absolute; left: calc(var(--gap) + var(--sa-l)); bottom: calc(var(--gap) + var(--sa-b));
   right: calc(var(--panel-w) + var(--gap) * 2 + var(--sa-r)); max-width: 46rem;
   display: flex; gap: 0.9rem; align-items: flex-start;
-  background: var(--paper); background-image: var(--noise), radial-gradient(ellipse at 50% 40%, transparent 55%, #8a5a2a2e 100%);
+  background: var(--paper); background-image: var(--noise), radial-gradient(ellipse at 50% 40%, transparent 55%, #8a5a2a2e 100%); background-blend-mode: var(--tex-blend), normal;
   border: 1px solid var(--paper-edge); border-radius: 0.6rem; padding: 1rem 1.1rem;
   box-shadow: 0 10px 30px #000a, 0 0 0 1px #2a1a0c55;
   animation: pop 0.25s ease-out; z-index: 3;
