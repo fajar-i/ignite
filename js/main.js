@@ -16,7 +16,7 @@ import { createEditor, newDraft, draftToLevel, encodeDraft, decodeDraft } from '
 import { World, DIRS, CONDITIONS } from './world.js';
 import { interpret, LimitError, fromCompact, newId, bumpId, childLists, countBlocks } from './interpreter.js';
 import {
-  GAME_TITLE, SPEAKERS, PROLOG, EPILOG, STAGE_INTRO, HINTS, FAIL_LINES, WIN_LINES, EFFECT_LINES,
+  GAME_TITLE, SPEAKERS, PROLOG, EPILOG, EPILOG_MOODS, STAGE_INTRO, HINTS, FAIL_LINES, WIN_LINES, EFFECT_LINES,
 } from './story.js';
 import { MODELS, TEXTURES } from './assets-config.js';
 
@@ -928,6 +928,7 @@ const SAMPLES = {
   fall:   { file: 'move/dive.mp3', gain: 0.4 },         // jatuh ke lubang
   splash: { file: 'move/splash.mp3', gain: 0.45 },      // tercebur sungai racun
   fail:   { file: 'fail.mp3', gain: 0.4 },              // program gagal ("oopsies", wefgf, Pixabay)
+  reveal: { file: 'move/dive.mp3', gain: 0.55, rate: 0.52 }, // hentakan rendah saat plot twist epilog
 };
 // Tanpa suara: wait (diam di tempat).
 const buffers = {};
@@ -975,9 +976,10 @@ const makeTrack = (file, vol) => {
 const menuTrack = makeTrack('menu.mp3', 0.5);
 const gameTrack = makeTrack('game.mp3', 0.15);
 let musicOn = true; // dimatikan sementara oleh stopMusic (mis. saat epilog)
+let epilogSilent = false;
 function updateMusic() {
   const onTitle = !titleEl.hidden;
-  const allowed = !muted && settings.music > 0;
+  const allowed = !muted && settings.music > 0 && !epilogSilent;
   const duck = paused && document.getElementById('settingsOverlay')?.hidden ? 0.4 : 1;
   for (const [t, want, mult] of [[menuTrack, allowed && onTitle, 1], [gameTrack, allowed && !onTitle && musicOn, duck]]) {
     t.a.volume = Math.min(1, t.vol * (settings.music / 100) * mult);
@@ -1867,8 +1869,13 @@ document.getElementById('btnHint').onclick = () => {
 };
 
 const storyEl = document.getElementById('storyOverlay');
-function playStory(label, slides) {
+const storyCardEl = storyEl.querySelector('.story-card');
+const storyArtEl = document.getElementById('storyArt');
+const storyFlashEl = document.getElementById('storyFlash');
+
+function playStory(label, slides, { moods = null, silenceMusic = false, finishLabel = 'Selesai' } = {}) {
   blockingUI++;
+  if (silenceMusic) { epilogSilent = true; updateMusic(); }
   return new Promise((resolve) => {
     let i = 0;
     const show = () => {
@@ -1876,21 +1883,59 @@ function playStory(label, slides) {
       const p = document.getElementById('storyText');
       p.textContent = personalize(slides[i]);
       p.style.animation = 'none'; void p.offsetWidth; p.style.animation = '';
+      if (moods) {
+        const mood = moods[i] || '';
+        storyEl.dataset.mood = mood;
+        if (mood === 'reveal') {
+          sfx('reveal');
+          storyCardEl.classList.remove('shake'); void storyCardEl.offsetWidth; storyCardEl.classList.add('shake');
+          storyFlashEl.classList.remove('go'); void storyFlashEl.offsetWidth; storyFlashEl.classList.add('go');
+        } else {
+          storyCardEl.classList.remove('shake');
+          storyFlashEl.classList.remove('go');
+        }
+      }
       document.getElementById('storyDots').textContent = `${i + 1} / ${slides.length}`;
-      document.getElementById('storyNext').textContent = i < slides.length - 1 ? 'Lanjut ›' : 'Selesai';
+      document.getElementById('storyNext').textContent = i < slides.length - 1 ? 'Lanjut ›' : finishLabel;
     };
     const done = () => {
       storyEl.hidden = true;
+      storyEl.removeAttribute('data-mood');
+      storyEl.classList.remove('is-epilog');
+      storyCardEl.classList.remove('shake');
+      storyFlashEl.classList.remove('go');
+      storyArtEl.hidden = true;
       blockingUI--;
+      if (silenceMusic) { epilogSilent = false; updateMusic(); }
       document.getElementById('storyNext').onclick = null;
       document.getElementById('storySkip').onclick = null;
       resolve();
     };
-    document.getElementById('storyNext').onclick = () => { sfx('click'); if (++i < slides.length) show(); else done(); };
+    document.getElementById('storyNext').onclick = () => {
+      const nextIdx = i + 1;
+      if (!(moods && moods[nextIdx] === 'reveal')) sfx('click');
+      if (++i < slides.length) show(); else done();
+    };
     document.getElementById('storySkip').onclick = done;
+    storyArtEl.hidden = !moods;
+    storyEl.classList.toggle('is-epilog', !!moods);
     storyEl.hidden = false;
     show();
   });
+}
+
+const hasFinishedCampaign = () => {
+  const lastId = LEVELS[LEVELS.length - 1]?.id;
+  return progress().stars[lastId] != null || !!load('seenEpilog', false);
+};
+async function playEpilog({ finishLabel = 'Kembali ke Sampul' } = {}) {
+  await playStory('Epilog', EPILOG, {
+    moods: EPILOG_MOODS,
+    silenceMusic: true,
+    finishLabel,
+  });
+  store('seenEpilog', true);
+  renderTitle();
 }
 
 // ------------------------------------------------------------
@@ -2222,11 +2267,17 @@ function openStages() {
     };
     cg.appendChild(card);
   }
+  document.getElementById('btnStageEpilog').hidden = !hasFinishedCampaign();
   stageOverlay.hidden = false;
 }
 function newLevel() { audio(); const d = newDraft(); saveCustom(d); enterEditor(d); }
 document.getElementById('btnStages').onclick = openStages;
 document.getElementById('btnTitleStages').onclick = openStages;
+document.getElementById('btnStageEpilog').onclick = async () => {
+  stageOverlay.hidden = true;
+  audio();
+  await playEpilog({ finishLabel: 'Tutup' });
+};
 document.getElementById('btnCloseStages').onclick = () => { stageOverlay.hidden = true; };
 stageOverlay.onclick = (e) => { if (e.target === stageOverlay) stageOverlay.hidden = true; };
 document.getElementById('btnNewLevel').onclick = newLevel;
@@ -2250,7 +2301,7 @@ document.getElementById('btnNext').onclick = async () => {
   const i = LEVELS.indexOf(stage);
   if (i < LEVELS.length - 1) return loadStage(i + 1, { introduceBlocks: true });
   stopMusic();
-  await playStory('Epilog', EPILOG);
+  await playEpilog({ finishLabel: 'Kembali ke Sampul' });
   titleEl.hidden = false;
 };
 
@@ -2269,6 +2320,7 @@ function renderTitle() {
       <span class="slot-meta">Slot ${activeSlot()} · ${chapterOf({ id: Math.min(info.unlocked, LEVELS.length) })} · <span class="st">★</span> ${info.stars}/${LEVELS.length * 3}</span>`;
   }
   document.getElementById('btnPlay').textContent = has ? 'LANJUTKAN' : 'MULAI PETUALANGAN';
+  document.getElementById('btnEpilog').hidden = !hasFinishedCampaign();
 }
 function setName(n) {
   player.name = n.trim().slice(0, 20);
@@ -2294,6 +2346,10 @@ document.getElementById('btnProlog').onclick = async () => {
   audio();
   await playStory('Prolog', PROLOG);
   store('seenProlog', true);
+};
+document.getElementById('btnEpilog').onclick = async () => {
+  audio();
+  await playEpilog({ finishLabel: 'Tutup' });
 };
 
 // ------------------------------------------------------------

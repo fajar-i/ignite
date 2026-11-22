@@ -422,18 +422,141 @@ body.boot-failed .boot-mark { animation: none; color: var(--bad); }
 .credit { color: var(--ink-soft); font-size: 0.78rem; margin: 1.3rem 0 0; opacity: 0.8; font-style: italic; }
 
 /* ---------- cutscene: halaman buku ---------- */
-.story { background: #0c0703e6; }
-.story-card { width: min(40rem, 100%); padding: 2.2rem 2.4rem 1.5rem; }
-.story-label { font-family: var(--title-font); font-weight: 900; letter-spacing: 0.2em; color: var(--wax); font-size: 1rem; text-align: center; margin-bottom: 1rem; }
+.story {
+  background: #0c0703e6;
+  transition: background 0.9s ease;
+}
+.story-flash {
+  position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle at 50% 42%, #ffd8dce6, #9c1628aa 45%, #0000 75%);
+}
+.story-flash.go { animation: story-flash 0.65s ease-out; }
+@keyframes story-flash {
+  0% { opacity: 0; }
+  18% { opacity: 0.95; }
+  100% { opacity: 0; }
+}
+.story-card {
+  position: relative; z-index: 2; width: min(40rem, 100%); max-height: 100%; overflow-y: auto;
+  padding: 2.2rem 2.4rem 1.5rem;
+  transition: background 0.85s ease, border-color 0.8s ease, box-shadow 0.85s ease, color 0.7s ease;
+}
+.story-card.shake { animation: story-shake 0.45s cubic-bezier(.36,.07,.19,.97); }
+@keyframes story-shake {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  20% { transform: translate3d(-5px, 2px, 0); }
+  40% { transform: translate3d(5px, -2px, 0); }
+  60% { transform: translate3d(-3px, 1px, 0); }
+  80% { transform: translate3d(3px, -1px, 0); }
+}
+.story-label {
+  font-family: var(--title-font); font-weight: 900; letter-spacing: 0.2em; color: var(--wax);
+  font-size: 1rem; text-align: center; margin-bottom: 1rem; transition: color 0.7s ease;
+}
 .story-label::before, .story-label::after { content: " ✦ "; color: var(--gold); }
+.story-art {
+  display: flex; align-items: flex-end; justify-content: center; gap: 1.6rem;
+  height: 9.5rem; margin: 0 auto 1.1rem;
+  -webkit-mask-image: linear-gradient(to bottom, #000 76%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 76%, transparent 100%);
+  transition: opacity 0.8s ease;
+}
+.story-figure {
+  height: 100%; display: flex; align-items: flex-end; justify-content: center;
+  transition: opacity 0.7s ease, transform 0.8s ease, filter 0.8s ease, width 0.6s ease, margin 0.6s ease;
+}
+.story-figure img { height: 100%; width: auto; object-fit: contain; user-select: none; }
+.story-figure.knight img { transform: scaleX(-1); }
 .story-text { font-size: clamp(1.05rem, 2.2vw, 1.3rem); line-height: 1.75; min-height: 7em; margin: 0 0 1.4rem; animation: fade 0.5s; }
 .story-text::first-letter {
   font-family: var(--initial-font); font-weight: 400; float: left; font-size: 3.4em; line-height: 0.85;
-  margin: 0.06em 0.14em 0 0; color: var(--wax);
+  margin: 0.06em 0.14em 0 0; color: var(--wax); transition: color 0.7s ease;
 }
 @keyframes fade { from { opacity: 0; } }
-.story-actions { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; border-top: 1px solid var(--ink-faint); padding-top: 0.9rem; }
-.story-dots { color: var(--ink-soft); font-size: 0.85rem; font-style: italic; }
+.story-actions { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; border-top: 1px solid var(--ink-faint); padding-top: 0.9rem; transition: border-color 0.7s ease; }
+.story-dots { color: var(--ink-soft); font-size: 0.85rem; font-style: italic; transition: color 0.7s ease; }
+
+/* mood dramatisasi epilog */
+#storyOverlay[data-mood="dawn"] {
+  background: radial-gradient(ellipse at 50% 35%, #5b3b18cc, #140c08f0 75%);
+}
+#storyOverlay[data-mood="dawn"] .story-figure {
+  filter: drop-shadow(0 0 14px #f7c77266);
+}
+#storyOverlay[data-mood="hush"] {
+  background: radial-gradient(ellipse at 50% 40%, #171828e0, #07060cf5 75%);
+}
+#storyOverlay[data-mood="hush"] .story-card {
+  box-shadow: 0 22px 54px #000000aa;
+}
+#storyOverlay[data-mood="hush"] .story-figure.knight {
+  opacity: 0; transform: translateX(-18px) scale(0.95);
+}
+#storyOverlay[data-mood="hush"] .story-figure.princess {
+  filter: brightness(0.68) saturate(0.6) drop-shadow(0 6px 14px #0008);
+}
+#storyOverlay[data-mood="reveal"],
+#storyOverlay[data-mood="cursed"],
+#storyOverlay[data-mood="finale"] {
+  background: radial-gradient(ellipse at 50% 38%, #470a14e6, #090204fa 72%);
+}
+#storyOverlay[data-mood="finale"] {
+  background: radial-gradient(ellipse at 50% 35%, #2b060de6, #070204f8 70%);
+}
+#storyOverlay[data-mood="reveal"] .story-card,
+#storyOverlay[data-mood="cursed"] .story-card,
+#storyOverlay[data-mood="finale"] .story-card {
+  background: linear-gradient(180deg, #1d0e13, #11070a);
+  color: #f3e8df;
+  border-color: #9e2a38;
+  box-shadow: 0 24px 60px #000000cc, 0 0 38px #8c16244d;
+}
+#storyOverlay[data-mood="reveal"] .story-label,
+#storyOverlay[data-mood="cursed"] .story-label,
+#storyOverlay[data-mood="finale"] .story-label { color: #e05868; }
+#storyOverlay[data-mood="reveal"] .story-text::first-letter,
+#storyOverlay[data-mood="cursed"] .story-text::first-letter { color: #d94452; }
+#storyOverlay[data-mood="reveal"] .story-actions,
+#storyOverlay[data-mood="cursed"] .story-actions,
+#storyOverlay[data-mood="finale"] .story-actions { border-top-color: #ffffff24; }
+#storyOverlay[data-mood="reveal"] .story-dots,
+#storyOverlay[data-mood="cursed"] .story-dots,
+#storyOverlay[data-mood="finale"] .story-dots,
+#storyOverlay[data-mood="reveal"] #storySkip,
+#storyOverlay[data-mood="cursed"] #storySkip,
+#storyOverlay[data-mood="finale"] #storySkip { color: #cbb7ae; }
+#storyOverlay[data-mood="reveal"] #storyNext,
+#storyOverlay[data-mood="cursed"] #storyNext,
+#storyOverlay[data-mood="finale"] #storyNext {
+  box-shadow: 0 0 18px #9e2a3877;
+}
+#storyOverlay[data-mood="reveal"] .story-figure.knight,
+#storyOverlay[data-mood="cursed"] .story-figure.knight,
+#storyOverlay[data-mood="finale"] .story-figure.knight {
+  opacity: 0; width: 0; margin: 0; overflow: hidden;
+}
+#storyOverlay[data-mood="reveal"] .story-art,
+#storyOverlay[data-mood="cursed"] .story-art,
+#storyOverlay[data-mood="finale"] .story-art { gap: 0; }
+#storyOverlay[data-mood="reveal"] .story-figure.princess,
+#storyOverlay[data-mood="cursed"] .story-figure.princess,
+#storyOverlay[data-mood="finale"] .story-figure.princess {
+  filter: brightness(0.18) contrast(2.2) drop-shadow(0 0 18px #c92238) drop-shadow(0 0 4px #ff5a6b);
+  animation: eerie-float 3.2s ease-in-out infinite;
+}
+@keyframes eerie-float {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1.03); }
+}
+#storyOverlay[data-mood="finale"] .story-art { opacity: 0.28; }
+#storyOverlay[data-mood="finale"] .story-text {
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  font-family: var(--title-font); font-size: clamp(1.6rem, 3.6vw, 2.3rem);
+  letter-spacing: 0.16em; color: #f0c987;
+}
+#storyOverlay[data-mood="finale"] .story-text::first-letter {
+  float: none; font-size: inherit; font-family: inherit; margin: 0; color: inherit;
+}
 
 /* ---------- profil ---------- */
 .profile-head { display: flex; align-items: center; gap: 1rem; text-align: left; }
@@ -536,7 +659,13 @@ body.hc {
 }
 body.hc .pitem, body.hc .pal-btn, body.hc .btn, body.hc .stage-card, body.hc .chip { border-color: #000; }
 body.hc .concept { color: #fff; background: #000c; padding: 0.4rem 0.6rem; border-radius: 0.4rem; }
+body.hc #storyOverlay[data-mood="reveal"] .story-card,
+body.hc #storyOverlay[data-mood="cursed"] .story-card,
+body.hc #storyOverlay[data-mood="finale"] .story-card {
+  background: #000; color: #fff; border-color: #ff5a6b;
+}
 body.rm *, body.rm *::before, body.rm *::after { animation: none !important; transition: none !important; }
+body.rm .story-flash { display: none; }
 body.rf {
   --title-font: "Segoe UI", system-ui, -apple-system, sans-serif;
   --body-font: "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -560,6 +689,8 @@ body.rf .story-text::first-letter { font-weight: 700; }
   .toast { left: 50%; top: 5rem; }
   .palette { grid-template-columns: repeat(3, 1fr); }
   .run-bar .run { min-width: 0; flex: 1; }
+  .story-art { height: 6.5rem; margin-bottom: 0.8rem; }
+  .story-text { min-height: 5.5em; }
 }
 
 /* ---------- hasil sensor: bukan hanya warna ---------- */
