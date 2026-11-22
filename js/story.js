@@ -11,10 +11,13 @@ export const NAMES = {
   land: 'Negeri yang Terlupakan',
 };
 
+// Gambar karakter dialog disimpan di assets/portraits/<nama>.png (latar transparan).
+// portrait: path PNG (null = pakai ikon emoji), side: 'left' | 'right' | 'center',
+// flip: true untuk membalik arah hadap gambar secara horizontal.
 export const SPEAKERS = {
-  princess: { name: NAMES.princess, icon: '👸' },
-  knight: { name: NAMES.knight, icon: '🛡️' },
-  narrator: { name: 'Narator', icon: '📜' },
+  princess: { name: NAMES.princess, icon: '👸', portrait: 'assets/portraits/princess.png', side: 'right', flip: false },
+  knight:   { name: NAMES.knight,   icon: '🛡️', portrait: 'assets/portraits/knight.png',   side: 'left',  flip: true },
+  narrator: { name: 'Narator',      icon: '📜', portrait: null,                            side: 'center', flip: false },
 };
 
 export const PROLOG = [

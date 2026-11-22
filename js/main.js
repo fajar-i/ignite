@@ -1492,6 +1492,9 @@ function showToast(msg) {
 
 const dialogEl = document.getElementById('dialog');
 const dialogOverlay = document.getElementById('dialogOverlay');
+const dlgCast = document.getElementById('dlgCast');
+const dlgActorLeft = document.getElementById('dlgActorLeft');
+const dlgActorRight = document.getElementById('dlgActorRight');
 const dlgPopCard = dialogOverlay.querySelector('.dialog-card');
 const dlgPopKicker = document.getElementById('dlgPopKicker');
 const dlgPopIcon = document.getElementById('dlgPopIcon');
@@ -1502,6 +1505,62 @@ const dlgPopDots = document.getElementById('dlgPopDots');
 const dlgPopPrev = document.getElementById('dlgPopPrev');
 const dlgPopNext = document.getElementById('dlgPopNext');
 const dlgPopSkip = document.getElementById('dlgPopSkip');
+
+const brokenPortraits = new Set();
+for (const sp of Object.values(SPEAKERS)) {
+  if (sp?.portrait) { const im = new Image(); im.src = sp.portrait; }
+}
+function renderPortraitCircle(el, sp) {
+  if (!el) return;
+  if (!sp?.portrait || brokenPortraits.has(sp.portrait)) { el.textContent = sp?.icon || ''; return; }
+  if (el.querySelector('img.portrait-img')?.getAttribute('src') === sp.portrait) return;
+  const img = document.createElement('img');
+  img.className = 'portrait-img';
+  img.alt = '';
+  img.decoding = 'async';
+  img.onerror = () => { brokenPortraits.add(sp.portrait); el.textContent = sp.icon; };
+  img.src = sp.portrait;
+  el.replaceChildren(img);
+}
+renderPortraitCircle(document.getElementById('hintSeal'), SPEAKERS.princess);
+
+function syncActor(slotEl, speakerKey, isActive) {
+  const asp = speakerKey ? SPEAKERS[speakerKey] : null;
+  if (!asp?.portrait || brokenPortraits.has(asp.portrait)) {
+    slotEl.hidden = true;
+    slotEl.classList.remove('enter', 'active', 'inactive', 'flip');
+    delete slotEl.dataset.speaker;
+    return false;
+  }
+  const wasHidden = slotEl.hidden;
+  const img = slotEl.querySelector('.dlg-sprite');
+  if (img.getAttribute('src') !== asp.portrait) {
+    img.onerror = () => {
+      brokenPortraits.add(asp.portrait);
+      slotEl.hidden = true;
+      if (![dlgActorLeft, dlgActorRight].some((el) => !el.hidden)) dlgCast.hidden = true;
+      if (dialogState && dialogState.lines[dialogState.i]?.[0] === speakerKey) {
+        dlgPopCard.dataset.hasSprite = '0';
+        dlgPopCard.dataset.side = 'center';
+        dlgPopIcon.hidden = false;
+        renderPortraitCircle(dlgPopIcon, asp);
+      }
+    };
+    img.src = asp.portrait;
+  }
+  slotEl.dataset.speaker = speakerKey;
+  slotEl.classList.toggle('flip', !!asp.flip);
+  slotEl.classList.toggle('active', isActive);
+  slotEl.classList.toggle('inactive', !isActive);
+  slotEl.hidden = false;
+  if (wasHidden) {
+    slotEl.classList.remove('enter');
+    void slotEl.offsetWidth;
+    slotEl.classList.add('enter');
+  }
+  return true;
+}
+
 let dialogState = null;
 function say(lines, { blocking = false } = {}) {
   closeDialog();
@@ -1520,13 +1579,38 @@ function showLine() {
     dialogEl.hidden = true;
     dlgPopKicker.textContent = stage.custom ? stage.name : `${chapterOf(stage)} · ${stage.name}`;
     dlgPopCard.dataset.speaker = who;
-    dlgPopIcon.textContent = sp.icon;
-    if (dialogState.lastSpeaker !== who) {
-      dlgPopIcon.style.animation = 'none';
-      void dlgPopIcon.offsetWidth;
-      dlgPopIcon.style.animation = '';
-      dialogState.lastSpeaker = who;
+
+    const hasPic = (k) => !!(SPEAKERS[k]?.portrait && !brokenPortraits.has(SPEAKERS[k].portrait));
+    const sideOf = (k) => SPEAKERS[k]?.side || 'center';
+    const distinctSides = new Set(lines.filter(([w]) => hasPic(w)).map(([w]) => sideOf(w)));
+    const layout = distinctSides.size > 1 ? 'duo' : 'solo';
+    dlgCast.dataset.layout = layout;
+
+    let leftKey = null, rightKey = null;
+    for (let k = 0; k <= i; k++) {
+      const w = lines[k][0];
+      if (!hasPic(w)) continue;
+      if (sideOf(w) === 'right') rightKey = w;
+      else leftKey = w;
     }
+    const leftShown = syncActor(dlgActorLeft, leftKey, who === leftKey);
+    const rightShown = syncActor(dlgActorRight, rightKey, who === rightKey);
+    dlgCast.hidden = !leftShown && !rightShown;
+
+    const activeHasSprite = (who === leftKey && leftShown) || (who === rightKey && rightShown);
+    dlgPopCard.dataset.hasSprite = activeHasSprite ? '1' : '0';
+    dlgPopCard.dataset.side = activeHasSprite && layout === 'duo' ? sideOf(who) : 'center';
+    dlgPopIcon.hidden = activeHasSprite;
+    if (!activeHasSprite) {
+      renderPortraitCircle(dlgPopIcon, sp);
+      if (dialogState.lastSpeaker !== who) {
+        dlgPopIcon.style.animation = 'none';
+        void dlgPopIcon.offsetWidth;
+        dlgPopIcon.style.animation = '';
+      }
+    }
+    dialogState.lastSpeaker = who;
+
     dlgPopName.textContent = sp.name;
     dlgPopText.textContent = personalize(text);
     dlgPopText.style.animation = 'none';
@@ -1542,7 +1626,7 @@ function showLine() {
     return;
   }
   dialogOverlay.hidden = true;
-  document.getElementById('dlgIcon').textContent = sp.icon;
+  renderPortraitCircle(document.getElementById('dlgIcon'), sp);
   document.getElementById('dlgName').textContent = sp.name;
   document.getElementById('dlgText').textContent = personalize(text);
   document.getElementById('dlgNext').textContent = i < lines.length - 1 ? 'Lanjut ›' : 'Tutup';
@@ -1555,6 +1639,9 @@ function closeDialog() {
   if (s.blocking) blockingUI--;
   dialogEl.hidden = true;
   dialogOverlay.hidden = true;
+  dlgActorLeft.hidden = true;
+  dlgActorRight.hidden = true;
+  dlgCast.hidden = true;
   s.resolve();
 }
 document.getElementById('dlgNext').onclick = () => {

@@ -61,7 +61,7 @@
 
     <div class="concept" id="concept"></div>
     <button class="hint-btn" id="btnHint" title="Minta petunjuk">
-      <span class="seal-mini">👸</span> Petunjuk
+      <span class="seal-mini" id="hintSeal">👸</span> Petunjuk
     </button>
     <div class="toast" id="toast" role="status"></div>
 
@@ -285,22 +285,36 @@
     </div>
   </div>
 
-  <!-- Dialog pembuka stage (pop-up modal) -->
+  <!-- Dialog pembuka stage (pop-up modal + model karakter) -->
   <div class="overlay" id="dialogOverlay" role="dialog" aria-modal="true" aria-labelledby="dlgPopName" aria-describedby="dlgPopText" hidden>
-    <div class="modal paper dialog-card">
-      <div class="dlg-top">
-        <div class="dlg-kicker" id="dlgPopKicker"></div>
-        <button class="link-btn dlg-skip" id="dlgPopSkip" type="button">Lewati</button>
-        <div class="portrait lg" id="dlgPopIcon" aria-hidden="true"></div>
-        <h2 class="dlg-pop-name" id="dlgPopName"></h2>
+    <div class="dlg-scene">
+      <div class="dlg-cast" id="dlgCast" aria-hidden="true" hidden>
+        <div class="dlg-actor left" id="dlgActorLeft" hidden>
+          <img class="dlg-sprite" alt="" decoding="async">
+        </div>
+        <div class="dlg-actor right" id="dlgActorRight" hidden>
+          <img class="dlg-sprite" alt="" decoding="async">
+        </div>
       </div>
-      <div class="dlg-pop-body" id="dlgPopBody">
-        <p class="dlg-pop-text" id="dlgPopText"></p>
-      </div>
-      <div class="bk-nav dlg-nav">
-        <button class="btn" id="dlgPopPrev" type="button">‹ Sebelumnya</button>
-        <div class="bk-dots" id="dlgPopDots" aria-hidden="true"></div>
-        <button class="run small" id="dlgPopNext" type="button" data-autofocus>Lanjut ›</button>
+      <div class="modal paper dialog-card">
+        <div class="dlg-top">
+          <div class="dlg-head-row">
+            <div class="dlg-kicker" id="dlgPopKicker"></div>
+            <button class="link-btn dlg-skip" id="dlgPopSkip" type="button">Lewati</button>
+          </div>
+          <div class="dlg-speaker-row">
+            <div class="portrait lg" id="dlgPopIcon" aria-hidden="true"></div>
+            <h2 class="dlg-pop-name" id="dlgPopName"></h2>
+          </div>
+        </div>
+        <div class="dlg-pop-body" id="dlgPopBody">
+          <p class="dlg-pop-text" id="dlgPopText"></p>
+        </div>
+        <div class="bk-nav dlg-nav">
+          <button class="btn" id="dlgPopPrev" type="button">‹ Sebelumnya</button>
+          <div class="bk-dots" id="dlgPopDots" aria-hidden="true"></div>
+          <button class="run small" id="dlgPopNext" type="button" data-autofocus>Lanjut ›</button>
+        </div>
       </div>
     </div>
   </div>
