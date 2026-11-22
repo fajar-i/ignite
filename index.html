@@ -112,36 +112,39 @@
 
   <!-- Sampul buku (layar judul) -->
   <div class="overlay title-screen" id="titleOverlay">
-    <div class="title-card paper">
-      <div class="ornament" aria-hidden="true">✦ ✦ ✦</div>
-      <h1 id="gameTitle"></h1>
-      <div class="rule"><span>✦</span></div>
-      <p class="tagline">Jadilah mata bagi sang kesatria.<br>Susun perintah, keluarlah dari kastil.</p>
-      <p class="theme-line">Satu langkah kecil · satu perintah · satu akibat</p>
-      <label class="name-field" id="nameField">
-        <span>Siapa namamu, pembaca?</span>
-        <input id="nameInput" maxlength="20" placeholder="Tulis namamu di sini" autocomplete="off" data-autofocus>
-      </label>
-      <p class="welcome" id="welcomeText" hidden></p>
-      <div class="title-actions">
-        <button class="run" id="btnPlay" data-autofocus>BUKA BUKU</button>
-        <div class="title-row">
-          <button class="btn" id="btnLoadProfile">Muat profil</button>
-          <button class="btn" id="btnNewProfile">Profil baru</button>
-        </div>
-        <div class="title-row">
-          <button class="btn" id="btnTitleStages">Daftar bab</button>
-          <button class="btn" id="btnTitleEditor">Buat level</button>
-        </div>
-        <div class="title-row">
-          <button class="btn" id="btnProlog">Prolog</button>
-          <button class="btn" id="btnEpilog" hidden>Epilog</button>
-          <button class="btn" id="btnTitleProfile">Profil</button>
-          <button class="btn" id="btnTitleSettings">Pengaturan</button>
-          <button class="btn" id="btnTitleCredits">Kredit</button>
+    <!-- Menu utama ala diorama: render tim (kartu judul + kesatria) dengan tombol di bidang tanah yang sama.
+         Posisi bidang dihitung di js/main.js (layoutMenuPlane). Layar sempit memakai tata letak datar. -->
+    <div class="menu-scene" id="menuScene">
+      <img class="menu-art" id="menuArt" src="assets/menu/scene.webp" alt="" aria-hidden="true" draggable="false">
+      <div class="menu-plane" id="menuPlane">
+        <h1 id="gameTitle" class="sr-only"></h1>
+        <p class="sr-only">Jadilah mata bagi sang kesatria. Susun perintah, keluarlah dari kastil.</p>
+        <!-- Papan UI: seukuran kartu judul, di lantai yang sama, diputar 90 derajat (bersilangan) -->
+        <div class="menu-panel">
+          <div class="menu-board" aria-hidden="true"></div>
+          <div class="slab slab-note">
+            <label class="name-field" id="nameField">
+              <span>Siapa namamu, pembaca?</span>
+              <input id="nameInput" maxlength="20" placeholder="Tulis namamu di sini" autocomplete="off" data-autofocus>
+            </label>
+            <p class="welcome" id="welcomeText" hidden></p>
+          </div>
+          <div class="slab-row">
+            <button class="slab" id="btnProlog">Prolog</button>
+            <button class="slab" id="btnTitleProfile">Profil</button>
+          </div>
+          <button class="slab slab-main" id="btnPlay" data-autofocus>BUKA BUKU</button>
+          <button class="slab" id="btnTitleStages">Daftar Bab</button>
+          <button class="slab" id="btnTitleEditor">Buat Level</button>
+          
         </div>
       </div>
-      <p class="credit">Game edukasi STEM · Engineering</p>
+      <nav class="menu-corner" aria-label="Menu lain">
+        <button class="btn" id="btnEpilog" hidden>Epilog</button>
+        <button class="icon-btn" id="btnTitleSettings" title="Pengaturan" aria-label="Pengaturan"><svg viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg></button>
+        <button class="icon-btn credit-btn" id="btnTitleCredits" title="Kredit" aria-label="Kredit">©</button>
+      </nav>
+      <p class="menu-foot">Game edukasi STEM · Satu langkah kecil · satu perintah · satu akibat</p>
     </div>
   </div>
 
@@ -214,7 +217,8 @@
       <h3 class="sec-title">Bintang per bab</h3>
       <div class="chapter-stars" id="chapterStars"></div>
       <div class="modal-actions">
-        <button class="btn" id="btnSwitchProfile">Ganti profil</button>
+        <button class="btn" id="btnLoadProfile">Muat profil</button>
+        <button class="btn" id="btnNewProfile">Profil baru</button>
         <button class="btn" id="btnRename">Ganti nama</button>
         <button class="run small" id="btnCloseProfile" data-autofocus>Tutup</button>
       </div>

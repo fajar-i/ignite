@@ -2111,6 +2111,7 @@ function deleteCustom(id) {
 const titleEl = document.getElementById('titleOverlay');
 // Layar utama memakai latar versi berkilau tanpa dunia 3D; saat bermain kembali ke versi tenang.
 function syncTitleBg(instant = false) {
+  requestAnimationFrame(layoutMenuPlane);
   const onTitle = !titleEl.hidden;
   document.body.classList.toggle('on-title', onTitle);
   bgfx.setPreset(onTitle ? 'menu' : 'game', { instant });
@@ -2327,6 +2328,33 @@ document.getElementById('gameTitle').textContent = GAME_TITLE;
 document.title = GAME_TITLE;
 // ---------- sampul: nama pemain ----------
 const nameInput = document.getElementById('nameInput');
+// ---------- Menu utama ----------
+// Render tim (assets/menu/scene.webp: kartu judul + kesatria, latar transparan) diperbesar di kiri,
+// panel tombol perkamen biasa (datar) di kanan. Layar sempit: render di atas, tombol di bawah.
+const MENU_ART = {
+  w: 1920, h: 1080,
+  content: [178, 455, 1133, 973], // kotak isi render: kartu judul + kesatria
+};
+
+function layoutMenuPlane() {
+  const scene = document.getElementById('menuScene');
+  if (!scene || titleEl.hidden) return;
+  const art = document.getElementById('menuArt');
+  const vw = scene.clientWidth, vh = scene.clientHeight;
+  const wide = vw >= 900 && vw / vh >= 1.15;
+  // Panel tombol selalu datar/tegak (lebih nyaman dibaca). Layar lebar: render di kiri, panel di kanan.
+  scene.classList.add('menu-flat');
+  scene.classList.toggle('menu-wide', wide);
+  if (!wide) { art.style.cssText = ''; return; }
+  // render (kartu + kesatria) diperbesar di sisi kiri, maksimal 56% lebar / 78% tinggi layar
+  const [cx0, cy0, cx1, cy1] = MENU_ART.content;
+  const sc = Math.min((vw * 0.50) / (cx1 - cx0), (vh * 0.70) / (cy1 - cy0));
+  const ox = vw * 0.32 - ((cx0 + cx1) / 2) * sc;
+  const oy = vh * 0.52 - ((cy0 + cy1) / 2) * sc;
+  art.style.cssText = `width:${MENU_ART.w * sc}px;height:${MENU_ART.h * sc}px;left:${ox}px;top:${oy}px`;
+}
+window.addEventListener('resize', layoutMenuPlane);
+
 function renderTitle() {
   const has = !!player.name;
   document.getElementById('nameField').hidden = has;
@@ -2337,8 +2365,11 @@ function renderTitle() {
     w.innerHTML = `Selamat datang kembali, <b>${esc(player.name)}</b>.<br>
       <span class="slot-meta">Slot ${activeSlot()} · ${chapterOf({ id: Math.min(info.unlocked, LEVELS.length) })} · <span class="st">★</span> ${info.stars}/${LEVELS.length * 3}</span>`;
   }
-  document.getElementById('btnPlay').textContent = has ? 'LANJUTKAN' : 'MULAI PETUALANGAN';
+  const playBtn = document.getElementById('btnPlay');
+  playBtn.textContent = has ? 'LANJUTKAN' : 'MULAI PETUALANGAN';
+  playBtn.classList.toggle('long', !has); // label panjang -> huruf lebih kecil agar muat di lembar
   document.getElementById('btnEpilog').hidden = !hasFinishedCampaign();
+  layoutMenuPlane();
 }
 function setName(n) {
   player.name = n.trim().slice(0, 20);
@@ -2525,13 +2556,13 @@ async function newProfileIn(s, info) {
   document.getElementById('btnPlay').click(); // langsung mulai: prolog lalu Bab I
 }
 
-document.getElementById('btnLoadProfile').onclick = () => openSlots('load');
+document.getElementById('btnLoadProfile').onclick = () => { profileOverlay.hidden = true; openSlots('load'); };
 document.getElementById('btnNewProfile').onclick = () => {
+  profileOverlay.hidden = true;
   const empty = Array.from({ length: SLOT_COUNT }, (_, i) => slotInfo(i + 1)).find((x) => x.empty);
   // ada slot kosong -> langsung pakai; semua penuh -> pilih slot untuk ditimpa
   if (empty) newProfileIn(empty.slot, empty); else openSlots('new');
 };
-document.getElementById('btnSwitchProfile').onclick = () => { profileOverlay.hidden = true; openSlots('load'); };
 document.getElementById('btnSaveNow').onclick = () => {
   saveProgram();
   store('player', player);
