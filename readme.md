@@ -53,10 +53,10 @@ node tools/validate.mjs
 | `assets/textures/wood_plank.jpg` (satu bilah dipotong, diputar & diperkecil) | ["Wooden horizontal planks background"](https://www.magnific.com/free-vector/wooden-horizontal-planks-background_9398307.htm), designed by macrovector - [Magnific.com](https://www.magnific.com) | Tekstur papan jembatan kayu | Lisensi Gratis Magnific, wajib atribusi |
 
 **Aset buatan tim:**
-Konsep game, cerita, dan rancangan materi edukasi berasal dari dokumen desain tim. Model 3D kesatria yang menggendong putri (`assets/models/MainKnightRig.glb`) dan golem batu (`assets/models/golem.glb`) beserta rig dan animasinya, render diorama menu utama (`assets/menu/scene.webp`), serta gambar karakter dialog (`assets/portraits/princess.png`, `assets/portraits/knight.png`), dimodelkan dan dirender oleh tim.
+Konsep game, cerita, dan rancangan materi edukasi berasal dari dokumen desain tim. Model 3D kesatria yang menggendong putri (`assets/models/MainKnightRig.glb`), monster gua (`assets/models/monster.glb`), dan golem batu (`assets/models/golem.glb`) beserta rig dan animasinya, render diorama menu utama (`assets/menu/scene.webp`), serta gambar karakter dialog (`assets/portraits/princess.png`, `assets/portraits/knight.png`), dimodelkan dan dirender oleh tim.
 
 **Elemen lain di dalam kode game:**
-- Model 3D sederhana (monster gua, papan, tuas, jembatan, gerbang, duri) disusun dari bentuk dasar bawaan Three.js (kubus, kapsul, kerucut, silinder, bola) dengan warna polos, tanpa tekstur.
+- Model 3D sederhana (papan, tuas, jembatan, gerbang, duri) disusun dari bentuk dasar bawaan Three.js (kubus, kapsul, kerucut, silinder, bola) dengan warna polos, tanpa tekstur.
 - Latar animasi (`js/bgfx.js`) adalah shader WebGL di dalam kode game dan bisa dimatikan di Pengaturan → Latar animasi.
 - Semua ikon, audio, font, dan foto tekstur berasal dari sumber berlisensi di tabel di atas.
 

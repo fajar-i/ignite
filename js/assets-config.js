@@ -69,9 +69,15 @@ export const MODELS = {
     offset: [0, 0.62, -0.24],
   },
 
+  // Model 3D monster + rig & animasi: dimodelkan & dianimasikan oleh tim (Ilyas Saputra).
   monster: {
-    url: null, // Contoh: 'assets/models/monster.glb'
-    height: 0.9,
+    url: 'assets/models/monster.glb',
+    idleClip: 'Idle',
+    sleepClip: 'Sleep',
+    toSleepClip: 'ToSleep',
+    toIdleClip: 'ToIdle',
+    attackClip: 'Attack',
+    height: 0.85,
     rotationX: 0,
     rotationY: 0,
     yOffset: 0,

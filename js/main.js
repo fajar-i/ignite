@@ -611,9 +611,63 @@ function stripRootMotion(clip) {
   return clip;
 }
 
+// Perbaiki artefak dekomposisi matriks singular ekspor Blender (skala tulang anak ~1e8 saat induk berskala 0)
+// serta cegah skala tepat 0 agar mesh tidak meledak saat transisi atau Z-fighting dengan lantai.
+function sanitizeActorClip(clip) {
+  if (!clip || clip.userData?.sanitized) return clip;
+  const badByBone = new Map();
+  for (const t of clip.tracks) {
+    if (!t.name.endsWith('.scale')) continue;
+    const bone = t.name.slice(0, t.name.lastIndexOf('.'));
+    const v = t.values;
+    for (let i = 0; i < v.length; i += 3) {
+      if (Math.abs(v[i]) > 100 || Math.abs(v[i + 1]) > 100 || Math.abs(v[i + 2]) > 100
+        || !Number.isFinite(v[i]) || !Number.isFinite(v[i + 1]) || !Number.isFinite(v[i + 2])) {
+        if (!badByBone.has(bone)) badByBone.set(bone, new Set());
+        badByBone.get(bone).add(i / 3);
+      }
+    }
+  }
+  for (const [bone, badSet] of badByBone) {
+    for (const t of clip.tracks) {
+      const dot = t.name.lastIndexOf('.');
+      if (dot < 0 || t.name.slice(0, dot) !== bone) continue;
+      const stride = t.getValueSize();
+      const count = t.values.length / stride;
+      for (const idx of badSet) {
+        if (idx >= count) continue;
+        let src = -1;
+        for (let d = 1; d < count; d++) {
+          if (idx - d >= 0 && !badSet.has(idx - d)) { src = idx - d; break; }
+          if (idx + d < count && !badSet.has(idx + d)) { src = idx + d; break; }
+        }
+        if (src < 0) continue;
+        for (let k = 0; k < stride; k++) t.values[idx * stride + k] = t.values[src * stride + k];
+      }
+    }
+  }
+  for (const t of clip.tracks) {
+    if (!t.name.endsWith('.scale')) continue;
+    const v = t.values;
+    for (let i = 0; i < v.length; i++) {
+      if (Math.abs(v[i]) < 0.005) v[i] = v[i] < 0 ? -0.005 : 0.005;
+    }
+  }
+  clip.userData = { ...clip.userData, sanitized: true };
+  return clip;
+}
+
 async function loadModel(cfg) {
   const raw = await loadRaw(cfg.url);
   const model = cloneSkinned(raw.scene);
+  // Buang widget rig Blender (mis. Auto-Rig Pro `cs_grp` / `cs_*`) agar tidak ikut dirender atau merusak bounding box.
+  const rigBones = new Set();
+  model.traverse((o) => { if (o.isSkinnedMesh && o.skeleton) for (const b of o.skeleton.bones) rigBones.add(b); });
+  const junk = [];
+  model.traverse((o) => {
+    if (o !== model && !o.isBone && !rigBones.has(o) && /^(cs_grp|cs_)/i.test(o.name)) junk.push(o);
+  });
+  for (const j of junk) j.parent?.remove(j);
   model.traverse((o) => {
     o.userData.fromModelCache = true;
     if (!o.isMesh) return;
@@ -850,11 +904,11 @@ async function applyMonsterModels() {
       a.body.add(wrap, ...keep.map((k) => { k.visible = false; return k; }));
 
       const clips = {
-        idle: findClip(animations, cfg.idleClip),
-        sleep: findClip(animations, cfg.sleepClip),
-        toSleep: findClip(animations, cfg.toSleepClip),
-        toIdle: findClip(animations, cfg.toIdleClip),
-        attack: findClip(animations, cfg.attackClip),
+        idle: sanitizeActorClip(findClip(animations, cfg.idleClip)),
+        sleep: sanitizeActorClip(findClip(animations, cfg.sleepClip)),
+        toSleep: sanitizeActorClip(findClip(animations, cfg.toSleepClip)),
+        toIdle: sanitizeActorClip(findClip(animations, cfg.toIdleClip)),
+        attack: sanitizeActorClip(findClip(animations, cfg.attackClip)),
       };
       if (Object.values(clips).some(Boolean)) {
         const mMixer = new THREE.AnimationMixer(model);
