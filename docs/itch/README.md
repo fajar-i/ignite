@@ -32,8 +32,15 @@ Buka halaman game → **Edit theme** (di atas halaman).
 | Link | `#9C2F2F` |
 | Button | `#9C2F2F` |
 | Banner | `banner.png`, posisi **Center** |
-| Header font | serif bergaya klasik (mis. *Cinzel* bila ada di daftar) |
-| Body font | serif yang mudah dibaca (mis. *Lora* / *Merriweather*) |
+| Header font | *Cinzel* (bila ada di daftar). Font judul game, Nodesto Caps Condensed, tidak tersedia di itch.io, tapi sudah tampil di banner |
+| Body font | **Rosario** (font paragraf game; tersedia di Google Fonts). Bila tidak ada di daftar: *Lato* / *Open Sans* |
 | Layout | Description di kiri, info di kanan (bawaan) |
 
 Hasilnya: latar malam gelap seperti menu game, dengan kolom isi berwarna perkamen seperti panel di dalam game.
+
+### Catatan font
+- Font game ada di `assets/fonts/`: **Nodesto Caps Condensed** (judul), **Rosario** (paragraf), **Solbera Imitation** (huruf hias).
+- Editor tema itch.io hanya menyediakan daftar font tetap, jadi file font lokal tidak bisa dipasang langsung. Pilih **Rosario** untuk teks bila tersedia.
+- Judul berfont Nodesto sudah tampil lewat **banner** dan **cover** (dibuat dari `assets/fonts` oleh `tools/make_itch_art.py`).
+- Bila akun mendapat fitur *Custom CSS* dari itch.io, font lokal bisa dipakai lewat `@font-face` yang menunjuk ke file font yang diunggah.
+

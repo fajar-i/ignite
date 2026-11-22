@@ -60,7 +60,7 @@ Fitur: 5 bab bercerita dengan plot twist, 3 bintang per bab (waktu menyusun), pe
 | Start | Jeda / pengaturan |
 
 ### Cara bermain di browser
-Klik **Run game**. Butuh koneksi internet (mesin 3D Three.js dimuat dari CDN). Disarankan Chrome/Edge/Firefox versi terbaru. Jika terasa berat, matikan **Pengaturan → Latar animasi**.
+Klik **Run game**. Semua file sudah disertakan, tidak butuh unduhan tambahan. Disarankan Chrome/Edge/Firefox versi terbaru. Jika terasa berat, matikan **Pengaturan → Latar animasi**.
 
 ### Tim
 - Fajari Arkan F — Programmer
@@ -70,11 +70,11 @@ Klik **Run game**. Butuh koneksi internet (mesin 3D Three.js dimuat dari CDN). D
 ### Kredit aset eksternal
 | Aset | Pembuat / Sumber | Kegunaan | Lisensi |
 | --- | --- | --- | --- |
-| [Three.js](https://threejs.org) r160 (+ addon `OrbitControls`, `GLTFLoader`, `FBXLoader`, `SkeletonUtils`) | Para kontributor Three.js, dimuat via [jsDelivr](https://www.jsdelivr.com) | Mesin 3D | MIT |
+| [Three.js](https://threejs.org) r160 (+ addon `OrbitControls`, `GLTFLoader`, `FBXLoader`, `SkeletonUtils`) | Para kontributor Three.js, disertakan lokal | Mesin 3D | MIT |
 | Font Nodesto Caps Condensed (`assets/fonts/NodestoCapsCondensed-Bold.otf`) | Solbera (imitasi font Nodesto untuk materi D&D 5e) | Teks judul / heading | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
 | Font Solbera Imitation (`assets/fonts/SolberaImitation.otf`) | Solbera (imitasi huruf hias Solbera untuk materi D&D 5e) | Huruf hias awal (drop cap) di layar cerita | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
 | Ikon UI & ikon blok ([Lucide](https://lucide.dev) v0.460.0, paket `lucide-static`) | Lucide Contributors (sebagian dari Feather oleh Cole Bemis) | Semua ikon tombol dan ikon blok perintah | ISC License (teks lisensi: `assets/licenses/lucide-LICENSE.txt`) |
-| Font [Cinzel](https://fonts.google.com/specimen/Cinzel) | Natanael Gama (via Google Fonts) | Cadangan teks judul (simbol yang tidak ada di Nodesto) | SIL Open Font License 1.1 |
+| Font [Cinzel](https://github.com/NDISCOVER/Cinzel) | The Cinzel Project Authors (Natanael Gama), disertakan lokal | Cadangan teks judul (simbol yang tidak ada di Nodesto) | SIL Open Font License 1.1 |
 | Font [Rosario](https://github.com/Omnibus-Type/Rosario) (`assets/fonts/rosario/`) | Copyright 2019 The Rosario Project Authors ([Omnibus-Type](https://github.com/Omnibus-Type/Rosario)) | Teks isi / paragraf | SIL Open Font License 1.1 (teks lisensi: `assets/fonts/rosario/OFL.txt`) |
 | `assets/sfx/click.mp3` | Sound Effect by <a href="https://pixabay.com/users/universfield-28281460/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=140881">Official Profile</a> from <a href="https://pixabay.com/sound-effects//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=140881">Pixabay</a> | Suara klik tombol / blok; juga belok, sensor, dan tombol Simpan (nada digeser) | [Pixabay Content License](https://pixabay.com/service/license-summary/) |
 | `assets/sfx/win.mp3` | Sound Effect by <a href="https://pixabay.com/users/universfield-28281460/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=143022">Official Profile</a> from <a href="https://pixabay.com//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=143022">Pixabay</a> | Suara bab/level selesai dan kartu "Blok Baru!" | [Pixabay Content License](https://pixabay.com/service/license-summary/) |

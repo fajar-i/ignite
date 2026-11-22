@@ -18,7 +18,7 @@ FILES = [
     'index.html', 'style.css', 'readme.md',
     'MainKnightRig.glb',
 ]
-DIRS = ['js', 'assets']
+DIRS = ['js', 'assets', 'vendor']
 SKIP = {
     'assets/paperlagi.jpg', 'assets/papersalah.jpg',  # tekstur lama, tidak dipakai
 }

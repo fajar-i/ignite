@@ -4,20 +4,18 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Eyes for the Nameless</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
   <script type="importmap">
     {
       "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        "three": "./vendor/three/build/three.module.js",
+        "three/addons/": "./vendor/three/examples/jsm/"
       }
     }
   </script>
 </head>
 <body class="on-title booting">
-  <!-- Layar muat: tampil sampai js/main.js selesai (three.js dari CDN bisa lambat) -->
+  <!-- Layar muat: tampil sampai js/main.js selesai -->
   <div class="boot" id="boot" role="status" aria-live="polite">
     <div class="boot-mark" aria-hidden="true">✦</div>
     <p id="bootText">Membuka buku…</p>
@@ -382,10 +380,10 @@
 
   <script type="module" src="js/main.js"></script>
   <script>
-    // Bila modul gagal dimuat (mis. tanpa internet), jangan biarkan layar muat berputar selamanya.
+    // Bila modul gagal dimuat, jangan biarkan layar muat berputar selamanya.
     setTimeout(function () {
       if (document.body.classList.contains('booting')) {
-        document.getElementById('bootText').textContent = 'Gagal memuat. Periksa koneksi internet, lalu muat ulang halaman.';
+        document.getElementById('bootText').textContent = 'Gagal memuat. Muat ulang halaman; bila masih gagal, coba browser lain.';
         document.body.classList.add('boot-failed');
       }
     }, 20000);

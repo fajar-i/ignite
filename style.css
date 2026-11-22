@@ -17,6 +17,22 @@
   src: url("assets/fonts/rosario/Rosario-Italic-VariableFont_wght.ttf") format("truetype");
   font-weight: 300 700; font-style: italic; font-display: swap;
 }
+/* Cinzel (SIL OFL 1.1) disertakan lokal di vendor/cinzel: cadangan simbol untuk judul. */
+@font-face {
+  font-family: "Cinzel";
+  src: url("vendor/cinzel/cinzel-latin-500-normal.woff2") format("woff2");
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Cinzel";
+  src: url("vendor/cinzel/cinzel-latin-700-normal.woff2") format("woff2");
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Cinzel";
+  src: url("vendor/cinzel/cinzel-latin-900-normal.woff2") format("woff2");
+  font-weight: 900; font-style: normal; font-display: swap;
+}
 /* Huruf hias awal (drop cap); hanya berisi huruf A-Z. */
 @font-face {
   font-family: "Solbera Imitation";
@@ -388,7 +404,8 @@ input[type=range] { width: 100%; accent-color: var(--wax); }
 .menu-scene { position: absolute; inset: 0; }
 .menu-art {
   position: absolute; left: 0; top: 0; pointer-events: none; user-select: none;
-  filter: saturate(0.9) contrast(1.05) drop-shadow(0 18px 30px #0008); animation: fade 0.6s ease-out;
+  filter: brightness(1.3) saturate(0.9) contrast(1.05) drop-shadow(0 18px 30px #0008);
+  animation: fade 0.6s ease-out;
 }
 /* Bidang tanah: satuan lokal = 1000x625 untuk kartu di render; transform matrix3d dari JS. */
 .menu-plane { position: absolute; left: 0; top: 0; width: 1000px; height: 700px; transform-origin: 0 0; pointer-events: none; }
@@ -444,7 +461,15 @@ button.slab { font-size: 40px; padding: 0 20px; }
   display: flex; flex-wrap: wrap; gap: 0.45rem; justify-content: flex-end; max-width: min(36rem, 70vw);
 }
 .menu-corner .btn, .menu-corner .icon-btn { box-shadow: 0 4px 12px #0008; }
-.menu-corner .credit-btn { font-size: 1.35rem; font-weight: 700; line-height: 1; }
+.menu-corner .credit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+}
 .menu-foot {
   position: absolute; left: calc(1rem + var(--sa-l)); bottom: calc(1rem + var(--sa-b)); margin: 0;
   color: #f3e6c8b3; font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; text-shadow: 0 1px 3px #000;
@@ -474,7 +499,7 @@ body.rm .slab, body.rm .menu-art { transition: none; animation: none; }
 .menu-scene.menu-flat.menu-wide { display: block; padding: 0; overflow: hidden; }
 .menu-wide .menu-art { position: absolute; margin: 0; }
 .menu-wide .menu-plane {
-  position: absolute; left: auto; right: max(5vw, 2rem); top: 50%; height: auto; transform: translateY(-50%) !important;
+  position: absolute; left: auto; right: max(10vw, 3rem); top: 50%; height: auto; transform: translateY(-50%) !important;
   width: min(24rem, 32vw);
 }
 .menu-wide .menu-panel {
