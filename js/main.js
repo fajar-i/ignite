@@ -500,11 +500,13 @@ async function loadModel(cfg) {
 
 let mixer = null;
 let walkAction = null;
+let walkPair = []; // dua salinan klip Walk yang bergantian agar Walk -> Walk juga ter-crossfade
 let jumpAction = null;
 let moveAction = null; // aksi gerak yang sedang dipakai (jalan atau lompat)
 let walkRate = 0; // 0 = diam, >0 = kecepatan animasi jalan
 let idleAction = null;
-let walkW = 0; // bobot campuran jalan (0 = idle penuh, 1 = jalan penuh)
+const blendW = new Map(); // bobot campuran per klip (lihat loop render)
+const BLEND_SPEED = 12;    // makin besar makin cepat transisinya (12 ≈ 0,25 detik)
 let princessObj = buildPrincess();
 let knightHasEmbeddedPrincess = false;
 function setKnightObject(obj, { withPrincess = true } = {}) {
@@ -533,7 +535,7 @@ async function applyKnightModel() {
   const gen = ++knightModelGen;
   if (!KNIGHT_MODEL.url) {
     knightHasEmbeddedPrincess = false;
-    mixer = null; walkAction = null; idleAction = null; jumpAction = null; moveAction = null; walkW = 0;
+    mixer = null; walkAction = null; idleAction = null; jumpAction = null; moveAction = null; walkPair = []; blendW.clear();
     setKnightObject(buildKnight(), { withPrincess: true });
     return;
   }
@@ -563,13 +565,18 @@ async function applyKnightModel() {
     });
     knightHasEmbeddedPrincess = !!KNIGHT_MODEL.includesPrincess;
     setKnightObject(wrap, { withPrincess: !knightHasEmbeddedPrincess });
-    mixer = null; walkAction = null; idleAction = null; jumpAction = null; moveAction = null; walkW = 0;
+    mixer = null; walkAction = null; idleAction = null; jumpAction = null; moveAction = null; walkPair = []; blendW.clear();
 
     const clip = findClip(walkAnims, KNIGHT_MODEL.walkClip ?? 0);
     if (clip) {
       mixer = new THREE.AnimationMixer(model);
-      walkAction = mixer.clipAction(stripRootMotion(clip));
+      const walkClipStripped = stripRootMotion(clip);
+      walkAction = mixer.clipAction(walkClipStripped);
       walkAction.play();
+      // salinan kedua (klip di-clone agar menjadi aksi terpisah di mixer)
+      const walkB = mixer.clipAction(walkClipStripped.clone());
+      walkB.play();
+      walkPair = [walkAction, walkB];
     }
     if (!idleClip && KNIGHT_MODEL.idleClip != null) {
       const candidate = findClip(animations, KNIGHT_MODEL.idleClip);
@@ -724,14 +731,17 @@ renderer.setAnimationLoop(() => {
   const f = Math.min(1, dt * 7);
   if (mixer) {
     if (idleAction) {
-      // campur halus idle <-> jalan
-      walkW += ((walkRate > 0 ? 1 : 0) - walkW) * Math.min(1, dt * 9);
-      idleAction.setEffectiveWeight(1 - walkW);
-      for (const act of [walkAction, jumpAction]) {
+      // Auto blend in/out: setiap klip punya bobot sendiri yang bergerak halus ke targetnya
+      // (Idle <-> Walk <-> Jump), kira-kira 0,25 detik per transisi. Jumlah bobot tetap 1.
+      const active = walkRate > 0 ? (moveAction || walkAction) : idleAction;
+      const k = 1 - Math.exp(-dt * BLEND_SPEED);
+      for (const act of [idleAction, ...walkPair, jumpAction]) {
         if (!act) continue;
-        const active = act === (moveAction || walkAction);
-        act.setEffectiveWeight(active ? walkW : 0);
-        if (active && walkRate > 0) act.setEffectiveTimeScale(walkRate);
+        const w0 = blendW.get(act) ?? (act === idleAction ? 1 : 0);
+        const w = w0 + ((act === active ? 1 : 0) - w0) * k;
+        blendW.set(act, w);
+        act.setEffectiveWeight(w);
+        if (act === active && act !== idleAction && walkRate > 0) act.setEffectiveTimeScale(walkRate);
       }
       mixer.update(dt);
     } else if (walkRate > 0) mixer.update(dt * walkRate);
@@ -793,7 +803,7 @@ async function travel(ev, token) {
   const to = new THREE.Vector3(worldX(ev.to.x), H, worldZ(ev.to.z));
   const jump = ev.type === 'jump';
   const arc = jump ? (jumpAction ? 0.12 : 0.7) : 0; // klip Jump sudah membawa lonjakan tubuh sendiri
-  const ms = dur(jump ? 560 : 420);
+  const ms = dur(jump ? (KNIGHT_MODEL.jumpMs ?? 560) : (KNIGHT_MODEL.walkMs ?? 420));
   // satu petak = satu langkah kaki = 1/walkSteps klip
   if (jump && jumpAction) {
     // klip lompat diputar penuh sekali selama lompatan
@@ -801,9 +811,17 @@ async function travel(ev, token) {
     jumpAction.reset().play(); // mulai dari awal; LoopOnce mencegah lompatan kedua
     walkRate = jumpAction.getClip().duration / (ms / 1000);
   } else if (walkAction) {
-    moveAction = walkAction;
     const steps = KNIGHT_MODEL.walkSteps || 2;
-    if (steps === 1) walkAction.time = 0; // animasi satu langkah: mulai dari awal tiap petak
+    if (steps === 1) {
+      // klip penuh per petak: pakai salinan Walk yang lain mulai dari frame 0,
+      // salinan sebelumnya memudar keluar (crossfade Walk -> Walk)
+      // ganti salinan bila yang sekarang masih terlihat (bobot > 0), supaya tidak meloncat ke frame 0
+      if (walkPair.length === 2 && (blendW.get(walkAction) ?? 0) > 0.05) {
+        walkAction = walkPair[0] === moveAction ? walkPair[1] : walkPair[0];
+      }
+      walkAction.reset().play();
+    }
+    moveAction = walkAction;
     walkRate = (walkAction.getClip().duration / steps) / (ms / 1000);
   }
   await tween(ms, (t) => {

@@ -20,6 +20,8 @@
  * - walkUrl          : file animasi jalan terpisah (opsional). `null` = pakai klip dari `url`.
  * - walkClip         : nama (string) atau indeks (number) klip animasi jalan.
  * - walkSteps        : jumlah petak langkah dalam satu siklus klip jalan (Mixamo/rig 2 langkah = 2, one-step = 1).
+ * - walkMs           : lama gerak satu petak saat Maju (ms, pada kecepatan 1x). Bawaan 420.
+ * - jumpMs           : lama satu lompatan (ms, pada kecepatan 1x). Bawaan 560.
  * - idleUrl          : file animasi diam terpisah (opsional, boleh Mixamo "Without Skin").
  * - idleClip         : nama (string) atau indeks (number) klip animasi diam (dari `idleUrl` atau `url`).
  * - jumpClip         : nama (string) atau indeks (number) klip animasi lompat di dalam `url` (opsional).
@@ -34,7 +36,9 @@ export const MODELS = {
   knight: {
     url: 'MainKnightRig.glb',
     walkClip: 'Walk',
-    walkSteps: 2,
+    walkSteps: 1, // klip Walk (34 frame @24fps) diputar penuh di setiap perintah Maju
+    walkMs: 692, // lama satu langkah (ms, kecepatan 1x). 1400 = kecepatan asli klip; lebih kecil = kaki lebih cepat
+    jumpMs: 800, // lama satu lompatan (ms, kecepatan 1x). Klip Jump = 1000 ms; lebih besar = lebih lambat
     idleClip: 'Idle',
     jumpClip: 'Jump',
     walkUrl: null,
