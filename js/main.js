@@ -2772,6 +2772,19 @@ function openCredits() {
 document.getElementById('btnTitleCredits').onclick = openCredits;
 document.getElementById('btnCloseCredits').onclick = () => { creditsOverlay.hidden = true; };
 creditsOverlay.onclick = (e) => { if (e.target === creditsOverlay) creditsOverlay.hidden = true; };
+
+// ---------- Panduan Kontrol ----------
+const controlsOverlay = document.getElementById('controlsOverlay');
+function openControls() {
+  camKeys.clear();
+  controlsOverlay.hidden = false;
+  sfx('click');
+}
+document.getElementById('btnControls').onclick = openControls;
+document.getElementById('camHelp').onclick = openControls;
+document.getElementById('btnCloseControls').onclick = () => { sfx('click'); controlsOverlay.hidden = true; };
+controlsOverlay.onclick = (e) => { if (e.target === controlsOverlay) { sfx('click'); controlsOverlay.hidden = true; } };
+
 document.getElementById('btnCloseProfile').onclick = () => { profileOverlay.hidden = true; };
 profileOverlay.onclick = (e) => { if (e.target === profileOverlay) profileOverlay.hidden = true; };
 // ---------- slot simpan: muat, profil baru, hapus, simpan, ekspor/impor ----------
@@ -2989,6 +3002,7 @@ document.getElementById('btnPause').onclick = openPause;
 document.getElementById('btnResume').onclick = () => { sfx('click'); closePause(); };
 document.getElementById('btnPauseRestart').onclick = () => { sfx('click'); closePause(); startLevel(stage, { intro: false }); };
 document.getElementById('btnPauseSettings').onclick = () => { sfx('click'); openSettings(); };
+document.getElementById('btnPauseControls').onclick = openControls;
 document.getElementById('btnPauseHome').onclick = () => { sfx('click'); goToMenu(); };
 pauseOverlay.onclick = (e) => { if (e.target === pauseOverlay) { sfx('click'); closePause(); } };
 
@@ -2997,7 +3011,7 @@ document.addEventListener('keydown', (e) => {
   const a = document.activeElement;
   if (a && ['INPUT', 'SELECT', 'TEXTAREA'].includes(a.tagName)) return;
   if (!titleEl.hidden || editing) return;
-  if (!pauseOverlay.hidden && settingsOverlay.hidden && askEl.hidden) {
+  if (!pauseOverlay.hidden && settingsOverlay.hidden && controlsOverlay.hidden && askEl.hidden) {
     e.preventDefault();
     sfx('click');
     closePause();
@@ -3012,6 +3026,7 @@ document.addEventListener('keydown', (e) => {
 function goBack() {
   if (!askEl.hidden) { askResolve?.(null); return; }
   if (!creditsOverlay.hidden) { creditsOverlay.hidden = true; return; }
+  if (!controlsOverlay.hidden) { controlsOverlay.hidden = true; return; }
   if (!blockOverlay.hidden) { blockCardsDone?.(); return; }
   if (!slotOverlay.hidden) { slotOverlay.hidden = true; return; }
   if (!dialogOverlay.hidden) { closeDialog(); return; }
@@ -3052,7 +3067,7 @@ function goToMenu() {
     if (editor.draft) saveCustom(editor.draft);
     exitEditor();
   }
-  for (const o of [pauseOverlay, settingsOverlay, profileOverlay, stageOverlay, winOverlay, slotOverlay, creditsOverlay]) o.hidden = true;
+  for (const o of [pauseOverlay, settingsOverlay, profileOverlay, stageOverlay, winOverlay, slotOverlay, creditsOverlay, controlsOverlay]) o.hidden = true;
   world.reset();
   resetVisual();
   stopMusic();
@@ -3069,8 +3084,14 @@ document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.altKey || e.metaKey) return;
   const a = document.activeElement;
   if (a && ['INPUT', 'SELECT', 'TEXTAREA'].includes(a.tagName)) return;
-  if (!titleEl.hidden || editing || anyOverlayOpen()) return;
+  if (!titleEl.hidden) return;
   const k = e.key.toLowerCase();
+  if (k === '?' || k === 'h') {
+    if (!controlsOverlay.hidden) { e.preventDefault(); sfx('click'); controlsOverlay.hidden = true; }
+    else if (!anyOverlayOpen()) { e.preventDefault(); openControls(); }
+    return;
+  }
+  if (editing || anyOverlayOpen()) return;
   if (k === 'c') { e.preventDefault(); sfx('click'); resetCameraView(); }
   else if (k.length === 1 && 'wasd'.includes(k)) { camResetAnim = null; camKeys.add(k); }
 });

@@ -42,6 +42,9 @@
         <button class="icon-btn" id="btnCenterCam" title="Pusatkan kamera (C)" aria-label="Pusatkan kamera ke titik awal">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><line x1="12" x2="12" y1="2" y2="6" /><line x1="12" x2="12" y1="18" y2="22" /><line x1="2" x2="6" y1="12" y2="12" /><line x1="18" x2="22" y1="12" y2="12" /></svg>
         </button>
+        <button class="icon-btn" id="btnControls" title="Panduan kontrol (? / H)" aria-label="Panduan kontrol">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
+        </button>
         <button class="icon-btn" id="btnEditLevel" title="Kembali ke editor level" aria-label="Edit level ini" hidden>
           <svg viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /><path d="m15 5 4 4" /></svg>
         </button>
@@ -57,6 +60,17 @@
     <div class="concept" id="concept"></div>
     <button class="hint-btn" id="btnHint" title="Minta petunjuk">
       <span class="seal-mini" id="hintSeal">👸</span> Petunjuk
+    </button>
+    <button class="cam-help" id="camHelp" type="button" title="Buka panduan kontrol lengkap (? / H)" aria-label="Panduan kontrol kamera dan tombol">
+      <span><b>Putar:</b> Seret</span>
+      <span class="sep" aria-hidden="true">·</span>
+      <span><b>Geser:</b> Klik kanan / <kbd>WASD</kbd></span>
+      <span class="sep" aria-hidden="true">·</span>
+      <span><b>Zoom:</b> Scroll</span>
+      <span class="sep" aria-hidden="true">·</span>
+      <span><b>Pusat:</b> <kbd>C</kbd></span>
+      <span class="sep" aria-hidden="true">·</span>
+      <span class="cam-help-more">Kontrol <kbd>?</kbd></span>
     </button>
     <div class="toast" id="toast" role="status"></div>
 
@@ -137,13 +151,12 @@
           <button class="slab slab-main" id="btnPlay" data-autofocus>BUKA BUKU</button>
           <button class="slab" id="btnTitleStages">Daftar Bab</button>
           <button class="slab" id="btnTitleEditor">Buat Level</button>
-          
+          <button class="slab" id="btnTitleCredits">Kredit</button>
         </div>
       </div>
       <nav class="menu-corner" aria-label="Menu lain">
         <button class="btn" id="btnEpilog" hidden>Epilog</button>
         <button class="icon-btn" id="btnTitleSettings" title="Pengaturan" aria-label="Pengaturan"><svg viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg></button>
-        <button class="icon-btn credit-btn" id="btnTitleCredits" title="Kredit" aria-label="Kredit">©</button>
       </nav>
       <p class="menu-foot">Game edukasi STEM · Satu langkah kecil · satu perintah · satu akibat</p>
     </div>
@@ -244,6 +257,10 @@
           <svg viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg>
           Pengaturan
         </button>
+        <button class="btn" id="btnPauseControls" type="button">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
+          Panduan kontrol
+        </button>
         <button class="btn" id="btnPauseHome" type="button">
           <svg viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg>
           Menu utama
@@ -259,6 +276,58 @@
       <div class="credits-body" id="creditsBody"></div>
       <div class="modal-actions">
         <button class="run small" id="btnCloseCredits" data-autofocus>Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panduan Kontrol -->
+  <div class="overlay" id="controlsOverlay" role="dialog" aria-modal="true" aria-labelledby="controlsTitle" hidden>
+    <div class="modal wide paper controls-modal">
+      <h2 id="controlsTitle">Panduan Kontrol</h2>
+      <p class="ctrl-sub">Pilih cara bermain yang paling nyaman: mouse, layar sentuh, keyboard, atau controller.</p>
+      <div class="ctrl-body">
+        <div class="ctrl-grid">
+          <section class="ctrl-sec">
+            <h3>Kamera &amp; Mouse / Sentuh</h3>
+            <ul class="ctrl-list">
+              <li><span>Putar kamera</span><span><kbd>Seret kiri</kbd> / <kbd>1 jari</kbd></span></li>
+              <li><span>Geser kamera (pan)</span><span><kbd>Seret kanan</kbd> / <kbd>Shift + seret</kbd> / <kbd>2 jari</kbd></span></li>
+              <li><span>Zoom masuk / keluar</span><span><kbd>Scroll</kbd> / <kbd>Cubit 2 jari</kbd></span></li>
+              <li><span>Pusatkan kamera</span><span><kbd>C</kbd> atau tombol bidik</span></li>
+              <li><span>Susun &amp; hapus blok</span><span><kbd>Klik</kbd> tambah · <kbd>Seret</kbd> atur / buang</span></li>
+            </ul>
+          </section>
+          <section class="ctrl-sec">
+            <h3>Keyboard</h3>
+            <ul class="ctrl-list">
+              <li><span>Pindah fokus menu &amp; blok</span><span><kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> / <kbd>Tab</kbd></span></li>
+              <li><span>Pilih / masuk wadah</span><span><kbd>Enter</kbd> / <kbd>Spasi</kbd></span></li>
+              <li><span>Geser kamera / pusatkan</span><span><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> / <kbd>C</kbd></span></li>
+              <li><span>Geser urutan blok</span><span><kbd>Alt + ↑</kbd> / <kbd>Alt + ↓</kbd></span></li>
+              <li><span>Hapus blok terpilih</span><span><kbd>Delete</kbd> / <kbd>Backspace</kbd></span></li>
+              <li><span>Jeda / kembali / keluar wadah</span><span><kbd>P</kbd> / <kbd>Esc</kbd></span></li>
+              <li><span>Buka panduan kontrol</span><span><kbd>?</kbd> / <kbd>H</kbd></span></li>
+            </ul>
+          </section>
+          <section class="ctrl-sec ctrl-sec-wide">
+            <h3>Controller / Gamepad <small>(Xbox / PlayStation)</small></h3>
+            <ul class="ctrl-list ctrl-list-2col">
+              <li><span>Pindah fokus menu &amp; blok</span><span><kbd>D-pad</kbd> / <kbd>Stik Kiri</kbd></span></li>
+              <li><span>Pilih / aktifkan</span><span><kbd>A</kbd> (<kbd>✕</kbd>)</span></li>
+              <li><span>Kembali / keluar wadah / jeda</span><span><kbd>B</kbd> (<kbd>○</kbd>)</span></li>
+              <li><span>Jalankan program</span><span><kbd>Y</kbd> (<kbd>△</kbd>)</span></li>
+              <li><span>Minta petunjuk</span><span><kbd>X</kbd> (<kbd>□</kbd>)</span></li>
+              <li><span>Geser blok naik / turun</span><span><kbd>LB</kbd> / <kbd>RB</kbd> (<kbd>L1</kbd> / <kbd>R1</kbd>)</span></li>
+              <li><span>Jeda / Pengaturan</span><span><kbd>Start</kbd> (<kbd>Options</kbd>)</span></li>
+              <li><span>Editor Level</span><span><kbd>D-pad</kbd> kursor · tahan <kbd>RT</kbd> (<kbd>R2</kbd>) melukis</span></li>
+            </ul>
+            <p class="ctrl-note">Catatan: Kontrol kamera (putar, geser, zoom) menggunakan mouse, layar sentuh, atau tombol <kbd>WASD</kbd> &amp; <kbd>C</kbd> di keyboard.</p>
+          </section>
+        </div>
+        <p class="ctrl-editor-note"><b>Editor Level (Keyboard):</b> <kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd>, <kbd>-</kbd> pilih alat · <kbd>Shift + Panah</kbd> melukis · <kbd>Ctrl + Z</kbd> / <kbd>Y</kbd> undo/redo · <kbd>Ctrl + Enter</kbd> uji level.</p>
+      </div>
+      <div class="modal-actions">
+        <button class="run small" id="btnCloseControls" data-autofocus>Tutup</button>
       </div>
     </div>
   </div>
