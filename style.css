@@ -244,6 +244,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   box-shadow: 0 0 0 3px var(--gold), 0 3px 8px #0006;
 }
 .portrait, .seal-mini { overflow: hidden; }
+.portrait > svg, .seal-mini > svg { width: 1em; height: 1em; color: var(--paper); stroke-width: 1.8; }
 .portrait-img {
   width: 100%; height: 100%; object-fit: cover; object-position: 50% 8%;
   transform: scale(1.38); transform-origin: 50% 15%; display: block; pointer-events: none;
@@ -381,6 +382,7 @@ input[type=range] { width: 100%; accent-color: var(--wax); }
 .stage-card:hover:not(:disabled):not(.custom) { border-color: var(--wax); transform: translateY(-2px); box-shadow: 0 6px 14px #3b2a1a33; }
 .stage-card:disabled { filter: grayscale(0.7); opacity: 0.55; cursor: not-allowed; }
 .stage-card .no { font-family: var(--title-font); font-weight: 900; font-size: 1.15rem; color: var(--wax); letter-spacing: 0.08em; }
+.stage-card .no .lock-ico { width: 0.85em; height: 0.85em; vertical-align: -0.08em; margin-right: 0.3em; stroke-width: 2.6; }
 .stage-card .nm { font-weight: 700; font-size: 0.9rem; }
 .stage-card .cp { font-size: 0.78rem; color: var(--ink-soft); font-style: italic; }
 .stage-card .st { color: var(--gold-deep); font-size: 1rem; letter-spacing: 0.15rem; }
@@ -765,6 +767,7 @@ body.editing #camHelp { display: none; }
 .ed-size span:nth-of-type(2) { margin-left: 0.6rem; }
 .ed-grid { display: grid; gap: 1px; background: #3b2a1a66; border: 1px solid var(--ink-soft); padding: 1px; touch-action: none; user-select: none; width: 100%; border-radius: 0.2rem; }
 .ecell { aspect-ratio: 1; display: grid; place-items: center; font-size: 0.68rem; font-weight: 800; color: #000a; cursor: crosshair; line-height: 1; font-family: system-ui, sans-serif; }
+.ecell svg { width: 1.2em; height: 1.2em; stroke-width: 2.4; }
 .ecell:hover { outline: 2px solid var(--wax); outline-offset: -2px; }
 .ecell.hole { background-image: repeating-linear-gradient(45deg, #ffffff12 0 3px, transparent 3px 7px); }
 .ed-settings summary { cursor: pointer; font-family: var(--title-font); font-weight: 700; font-size: 0.85rem; margin-bottom: 0.5rem; }
@@ -1121,20 +1124,22 @@ textarea.ask-field { font-family: ui-monospace, Consolas, monospace; font-size: 
   position: absolute; bottom: calc(var(--gap) + var(--sa-b)); right: calc(var(--panel-w) + var(--gap) * 2 + var(--sa-r));
   display: flex; align-items: center; gap: 0.42rem; flex-wrap: nowrap;
   max-width: calc(100% - var(--panel-w) - var(--gap) * 4 - 11rem); overflow: hidden; white-space: nowrap;
-  background: #23170dc7; color: #f3e6c8; border: 1px solid #d4b88755; border-radius: 999px;
-  padding: 0.42rem 0.9rem; font-size: 0.8rem; line-height: 1.3; backdrop-filter: blur(4px);
-  box-shadow: 0 4px 12px #0007; cursor: pointer;
+  /* gaya teks polos di atas dunia 3D, sama seperti .concept */
+  background: none; border: 0; border-radius: 0.3rem; box-shadow: none; padding: 0.2rem 0.3rem;
+  font: inherit; font-size: 0.88rem; line-height: 1.5; color: #f3e6c8e6;
+  text-shadow: 0 1px 3px #000; cursor: pointer;
 }
-.cam-help:hover, .cam-help:focus-visible { border-color: var(--gold); background: #2d1e12e6; }
-.cam-help b { color: #fff4da; font-weight: 700; }
-.cam-help .sep { opacity: 0.45; }
+.cam-help:hover, .cam-help:focus-visible { color: #f3e6c8; }
+.cam-help:hover .cam-help-more, .cam-help:focus-visible .cam-help-more { text-decoration: underline; text-underline-offset: 0.2em; }
+.cam-help b { color: #f3e6c8; font-weight: 700; }
+.cam-help .sep { opacity: 0.55; }
 .cam-help kbd {
-  font-family: ui-monospace, Consolas, monospace; font-size: 0.72rem;
-  background: #ffffff1f; border: 1px solid #f3e6c844; border-radius: 0.25rem;
-  padding: 0.04rem 0.3rem; color: #fff4da;
+  font-family: ui-monospace, Consolas, monospace; font-size: 0.76rem;
+  background: #0000004d; border: 1px solid #f3e6c855; border-radius: 0.25rem;
+  padding: 0.02rem 0.3rem; color: #f3e6c8; text-shadow: none;
 }
 .cam-help-more { color: var(--gold-light); font-weight: 700; }
-body.hc .cam-help { background: #000; color: #fff; border-color: #fff; }
+body.hc .cam-help { color: #fff; background: #000c; padding: 0.4rem 0.6rem; border-radius: 0.4rem; text-shadow: none; }
 @media (max-width: 1220px) { .cam-help { display: none; } }
 
 .modal.controls-modal {

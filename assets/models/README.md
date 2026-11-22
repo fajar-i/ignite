@@ -1,7 +1,7 @@
 # Tempat Model 3D Karakter (`assets/models/`)
 
 Folder ini disiapkan untuk menampung model 3D karakter tambahan atau override untuk **Eyes for the Nameless**.
-Saat ini model **Nameless Knight + Putri** sudah berjalan dari `MainKnightRig.glb` di root proyek (karya tim 3D artist: Ilyas Saputra), sedangkan slot `monster`, `golem`, dan `princess` terpisah tetap aman memakai placeholder selama nilainya masih `null` di `js/assets-config.js`.
+Saat ini model **Nameless Knight + Putri** sudah berjalan dari `assets/models/MainKnightRig.glb` (karya tim 3D artist: Ilyas Saputra), sedangkan slot `monster`, `golem`, dan `princess` terpisah tetap aman memakai placeholder selama nilainya masih `null` di `js/assets-config.js`.
 
 ## Nama File yang Disarankan
 

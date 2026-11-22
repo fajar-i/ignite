@@ -41,7 +41,7 @@
 export const MODELS = {
   // Model kesatria + putri digendong: dimodelkan, di-rig & dianimasikan oleh tim (Ilyas Saputra).
   knight: {
-    url: 'MainKnightRig.glb',
+    url: 'assets/models/MainKnightRig.glb',
     walkClip: 'Walk',
     walkSteps: 1, // klip Walk (34 frame @24fps) diputar penuh di setiap perintah Maju
     walkMs: 692, // lama satu langkah (ms, kecepatan 1x). 1400 = kecepatan asli klip; lebih kecil = kaki lebih cepat

@@ -4,7 +4,7 @@ Pakai:  python tools/build_web.py
 Hasil:  dist/eyes-for-the-nameless-web.zip  (index.html berada di akar zip)
 
 Hanya file yang dipakai game yang dimasukkan (daftar putih), jadi file kerja
-seperti .git, .claude, serve.py, tools/, dan tekstur cadangan tidak ikut.
+seperti .git, .claude, serve.py, dan tools/ tidak ikut.
 """
 import os
 import sys
@@ -16,12 +16,9 @@ OUT = os.path.join(OUT_DIR, 'eyes-for-the-nameless-web.zip')
 
 FILES = [
     'index.html', 'style.css', 'readme.md',
-    'MainKnightRig.glb',
 ]
 DIRS = ['js', 'assets', 'vendor']
-SKIP = {
-    'assets/paperlagi.jpg', 'assets/papersalah.jpg',  # tekstur lama, tidak dipakai
-}
+SKIP = set()
 
 
 def collect():

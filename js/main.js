@@ -1401,6 +1401,7 @@ const BLOCKS = {
   wait: { label: 'Tunggu', cat: 'act' },
   call: { label: 'Panggil Fungsi', cat: 'fn' },
 };
+const ICON_LOCK = '<svg class="lock-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>'; // lucide: lock
 const svg = (t) => `<svg viewBox="0 0 24 24">${ICONS[t]}</svg>`;
 const catVar = (t) => `var(--c-${BLOCKS[t].cat})`;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2041,13 +2042,13 @@ for (const sp of Object.values(SPEAKERS)) {
 }
 function renderPortraitCircle(el, sp) {
   if (!el) return;
-  if (!sp?.portrait || brokenPortraits.has(sp.portrait)) { el.textContent = sp?.icon || ''; return; }
+  if (!sp?.portrait || brokenPortraits.has(sp.portrait)) { el.innerHTML = sp?.icon || ''; return; }
   if (el.querySelector('img.portrait-img')?.getAttribute('src') === sp.portrait) return;
   const img = document.createElement('img');
   img.className = 'portrait-img';
   img.alt = '';
   img.decoding = 'async';
-  img.onerror = () => { brokenPortraits.add(sp.portrait); el.textContent = sp.icon; };
+  img.onerror = () => { brokenPortraits.add(sp.portrait); el.innerHTML = sp.icon || ''; };
   img.src = sp.portrait;
   el.replaceChildren(img);
 }
@@ -2560,7 +2561,7 @@ function openStages() {
     const st = p.stars[lv.id];
     b.className = 'stage-card' + (lv === stage && titleEl.hidden ? ' current' : '');
     b.disabled = locked;
-    b.innerHTML = `<span class="no">${locked ? '🔒 ' : ''}${chapterOf(lv)}</span>
+    b.innerHTML = `<span class="no">${locked ? ICON_LOCK : ''}${chapterOf(lv)}</span>
       <span class="nm">${lv.name}</span><span class="cp">${lv.concept}</span>
       <span class="st">${st != null ? '★'.repeat(st) + '☆'.repeat(3 - st) : '&nbsp;'}</span>`;
     b.onclick = () => { stageOverlay.hidden = true; titleEl.hidden = true; audio(); loadStage(i); };

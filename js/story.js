@@ -14,10 +14,17 @@ export const NAMES = {
 // Gambar karakter dialog disimpan di assets/portraits/<nama>.png (latar transparan).
 // portrait: path PNG (null = pakai ikon emoji), side: 'left' | 'right' | 'center',
 // flip: true untuk membalik arah hadap gambar secara horizontal.
+// Ikon cadangan (dipakai bila potret tidak ada/gagal dimuat): Lucide static
+// (https://lucide.dev, lisensi ISC; lihat assets/licenses/lucide-LICENSE.txt)
+const lucide = (body) => `<svg viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`;
+const ICON_CROWN = lucide('<path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" />'); // lucide: crown
+const ICON_SHIELD = lucide('<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />'); // lucide: shield
+const ICON_SCROLL = lucide('<path d="M15 12h-5" /><path d="M15 8h-5" /><path d="M19 17V5a2 2 0 0 0-2-2H4" /><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" />'); // lucide: scroll-text
+
 export const SPEAKERS = {
-  princess: { name: NAMES.princess, icon: '👸', portrait: 'assets/portraits/princess.png', side: 'right', flip: false },
-  knight:   { name: NAMES.knight,   icon: '🛡️', portrait: 'assets/portraits/knight.png',   side: 'left',  flip: true },
-  narrator: { name: 'Narator',      icon: '📜', portrait: null,                            side: 'center', flip: false },
+  princess: { name: NAMES.princess, icon: ICON_CROWN,  portrait: 'assets/portraits/princess.png', side: 'right', flip: false },
+  knight:   { name: NAMES.knight,   icon: ICON_SHIELD, portrait: 'assets/portraits/knight.png',   side: 'left',  flip: true },
+  narrator: { name: 'Narator',      icon: ICON_SCROLL, portrait: null,                            side: 'center', flip: false },
 };
 
 export const PROLOG = [

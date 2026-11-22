@@ -87,7 +87,7 @@ Klik **Run game**. Semua file sudah disertakan, tidak butuh unduhan tambahan. Di
 | `assets/paper.jpg` (tile 1400px yang dipotong & disambung dari foto asli) | [Olga Thelavart](https://unsplash.com/@olga_o) (via [Unsplash](https://unsplash.com)) | Tekstur kertas/kain UI | [Unsplash License](https://unsplash.com/license) |
 
 **Aset buatan tim:**
-Konsep game, cerita, dan rancangan materi edukasi berasal dari dokumen desain tim. Model 3D kesatria yang menggendong putri (`MainKnightRig.glb`) dan golem batu (`assets/models/golem.glb`) beserta rig dan animasinya, serta gambar karakter dialog (`assets/portraits/princess.png`, `assets/portraits/knight.png`), dimodelkan dan dirender oleh tim.
+Konsep game, cerita, dan rancangan materi edukasi berasal dari dokumen desain tim. Model 3D kesatria yang menggendong putri (`assets/models/MainKnightRig.glb`) dan golem batu (`assets/models/golem.glb`) beserta rig dan animasinya, serta gambar karakter dialog (`assets/portraits/princess.png`, `assets/portraits/knight.png`), dimodelkan dan dirender oleh tim.
 
 **Elemen lain di dalam kode game:**
 - Model 3D sederhana (monster gua, papan, tuas, jembatan, gerbang, duri) disusun dari bentuk dasar bawaan Three.js (kubus, kapsul, kerucut, silinder, bola) dengan warna polos, tanpa tekstur.

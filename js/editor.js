@@ -43,10 +43,17 @@ const cellName = (ch) => {
   if ('XYZ'.includes(ch)) return `Gerbang ${'XYZ'.indexOf(ch) + 1}`;
   return TOOLS.find((t) => t.key === ch)?.label || 'Lantai';
 };
+// Ikon petak: Lucide static (https://lucide.dev, lisensi ISC)
+const lucide = (body) => `<svg viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`;
+const CELL_ICON = {
+  door: lucide('<path d="M13 4h3a2 2 0 0 1 2 2v14" /><path d="M2 20h3" /><path d="M13 20h9" /><path d="M10 12v.01" /><path d="M13 4.562v16.157a1 1 0 0 1-1.242.97L5 20V5.562a2 2 0 0 1 1.515-1.94l4-1A2 2 0 0 1 13 4.561Z" />'), // lucide: door-open
+  monster: lucide('<path d="M9 10h.01" /><path d="M15 10h.01" /><path d="M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z" />'), // lucide: ghost
+  golem: lucide('<path d="m8 3 4 8 5-5 5 15H2L8 3z" />'), // lucide: mountain
+};
 const cellText = (ch, d) => {
   if (ch === 'S') return DIR_ARROW[d.startDir];
-  if (ch === 'E') return '🚪';
-  if (ch === 'M') return d.monsterKind === 'golem' ? '🗿' : '👹';
+  if (ch === 'E') return CELL_ICON.door;
+  if (ch === 'M') return d.monsterKind === 'golem' ? CELL_ICON.golem : CELL_ICON.monster;
   if ('123'.includes(ch)) return 'T' + ch;
   if ('abc'.includes(ch)) return 'J' + ('abc'.indexOf(ch) + 1);
   if ('XYZ'.includes(ch)) return 'G' + ('XYZ'.indexOf(ch) + 1);
