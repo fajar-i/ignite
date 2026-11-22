@@ -114,6 +114,17 @@ export const FAIL_LINES = {
   depth: 'Fungsi itu memanggil dirinya sendiri terus-menerus. Jangan panggil fungsi di dalam dirinya sendiri.',
 };
 
+// Sub-tema "sebab akibat": kalimat akibat untuk tiap alasan gagal (sebabnya = blok yang disorot).
+export const EFFECT_LINES = {
+  fall: 'kesatria jatuh, karena petak itu tidak punya pijakan',
+  river: 'kesatria tercebur ke sungai racun',
+  trap: 'kesatria menginjak duri',
+  caught: 'monster terbangun dan menangkap kesatria',
+  incomplete: 'perintah habis sebelum kesatria sampai di pintu keluar',
+  steps: 'program terus berputar dan tidak pernah selesai',
+  depth: 'fungsi memanggil dirinya sendiri tanpa henti',
+};
+
 export const WIN_LINES = {
   1: 'Kita berhasil turun! Kau mulai percaya pada suaraku, bukan?',
   2: 'Lorongnya terlewati. Satu pola, diulang. Rapi sekali.',

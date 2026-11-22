@@ -306,6 +306,23 @@ h2 { font-family: var(--title-font); font-weight: 700; margin: 0; letter-spacing
 .pitem .del:hover { color: var(--bad); }
 .pitem.dragging { opacity: 0.35; }
 .pitem.running { border-color: var(--gold); background: #fff1c4; box-shadow: 0 0 0 2px var(--gold-light); }
+/* Sub-tema sebab akibat: blok penyebab kegagalan terakhir */
+.pitem.cause { border-color: var(--bad); box-shadow: 0 0 0 2px #a83a2a55; position: relative; }
+.pitem.cause::after {
+  content: "Sebab"; position: absolute; top: -0.55rem; right: 0.5rem; font-size: 0.62rem; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; background: var(--bad); color: #fff; border-radius: 999px; padding: 0.05rem 0.45rem;
+}
+/* ---------- layar kredit ---------- */
+.modal.credits-modal { text-align: left; max-height: min(44rem, calc(100dvh - 2rem)); display: flex; flex-direction: column; }
+.modal.credits-modal h2 { text-align: center; }
+.credits-body { overflow-y: auto; min-height: 0; margin: 0.6rem 0 0.4rem; padding-right: 0.3rem; columns: 2 18rem; column-gap: 1.6rem; }
+.cr-group { break-inside: avoid; margin-bottom: 0.9rem; }
+.cr-group h3 { font-family: var(--title-font); font-size: 1rem; letter-spacing: 0.06em; color: var(--wax); margin: 0 0 0.3rem; }
+.cr-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.cr-group li { display: grid; gap: 0.05rem; font-size: 0.88rem; line-height: 1.35; }
+.cr-group li span { color: var(--ink-soft); font-size: 0.8rem; }
+.cr-group a { color: var(--wax); }
+.theme-line { margin: -0.4rem 0 0.9rem; font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-ink); font-weight: 700; }
 .pitem.eval-true > .rhead { color: var(--moss); font-weight: 700; }
 .pitem.eval-false > .rhead { color: var(--bad); font-weight: 700; }
 .pitem.box { flex-direction: column; align-items: stretch; padding: 0.4rem 0.45rem 0.45rem; background: #efe0bb; }

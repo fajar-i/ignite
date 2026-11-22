@@ -28,17 +28,26 @@ node tools/validate.mjs
 
 | Aset | Pembuat / Sumber | Kegunaan | Lisensi |
 | --- | --- | --- | --- |
-| `Walking.fbx`, `Idle.fbx` | [Mixamo](https://www.mixamo.com) (Adobe) | Model kesatria serta animasi berjalan & diam | Lisensi Mixamo (bebas royalti untuk proyek pribadi & komersial; file mentah tidak boleh didistribusikan ulang terpisah dari game) |
+| `Walking.fbx`, `Idle.fbx`, `LongStepForward.fbx` | [Mixamo](https://www.mixamo.com) (Adobe) | Model kesatria (3D di dalam bab) serta animasi melangkah & diam | Lisensi Mixamo (bebas royalti untuk proyek pribadi & komersial; file mentah tidak boleh didistribusikan ulang terpisah dari game) |
 | [Three.js](https://threejs.org) r160 (+ addon `OrbitControls`, `GLTFLoader`, `FBXLoader`, `SkeletonUtils`) | Para kontributor Three.js, dimuat via [jsDelivr](https://www.jsdelivr.com) | Mesin 3D | MIT |
 | Font Nodesto Caps Condensed (`assets/fonts/NodestoCapsCondensed-Bold.otf`) | Solbera (imitasi font Nodesto untuk materi D&D 5e) | Teks judul / heading | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
 | Font Solbera Imitation (`assets/fonts/SolberaImitation.otf`) | Solbera (imitasi huruf hias Solbera untuk materi D&D 5e) | Huruf hias awal (drop cap) di layar cerita | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+| Ikon UI & ikon blok ([Lucide](https://lucide.dev) v0.460.0, paket `lucide-static`) | Lucide Contributors (sebagian dari Feather oleh Cole Bemis) | Semua ikon tombol dan ikon blok perintah | ISC License (teks lisensi: `assets/licenses/lucide-LICENSE.txt`) |
 | Font [Cinzel](https://fonts.google.com/specimen/Cinzel) | Natanael Gama (via Google Fonts) | Cadangan teks judul (simbol yang tidak ada di Nodesto) | SIL Open Font License 1.1 |
 | Font [Rosario](https://github.com/Omnibus-Type/Rosario) (`assets/fonts/rosario/`) | Copyright 2019 The Rosario Project Authors ([Omnibus-Type](https://github.com/Omnibus-Type/Rosario)) | Teks isi / paragraf | SIL Open Font License 1.1 (teks lisensi: `assets/fonts/rosario/OFL.txt`) |
 | `assets/sfx/click.mp3` | Sound Effect by <a href="https://pixabay.com/users/universfield-28281460/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=140881">Official Profile</a> from <a href="https://pixabay.com/sound-effects//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=140881">Pixabay</a> | Suara klik tombol / blok; juga belok, sensor, dan tombol Simpan (nada digeser) | [Pixabay Content License](https://pixabay.com/service/license-summary/) |
 | `assets/sfx/win.mp3` | Sound Effect by <a href="https://pixabay.com/users/universfield-28281460/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=143022">Official Profile</a> from <a href="https://pixabay.com//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=143022">Pixabay</a> | Suara bab/level selesai dan kartu "Blok Baru!" | [Pixabay Content License](https://pixabay.com/service/license-summary/) |
 | `assets/sfx/menu.mp3` | Sound Effect by <a href="https://pixabay.com/users/gregorquendel-19912121/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=291600">Gregor Quendel</a> from <a href="https://pixabay.com//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=291600">Pixabay</a> | Musik layar utama (dipotong, diputar berulang) | [Pixabay Content License](https://pixabay.com/service/license-summary/) |
 | `assets/sfx/game.mp3` | Sound Effect by <a href="https://pixabay.com/users/freesound_community-46691455/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=49820">freesound_community</a> from <a href="https://pixabay.com//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=49820">Pixabay</a> | Musik latar di dalam bab (diputar berulang) | [Pixabay Content License](https://pixabay.com/service/license-summary/) |
-| `assets/paper.jpg` (tile 640px dari foto asli) | [Smithsonian](https://unsplash.com/@smithsonian) & [Olga Thelavart](https://unsplash.com/@olga_o) (via [Unsplash](https://unsplash.com)) | Tekstur kertas/kain UI | [Unsplash License](https://unsplash.com/license) |
+| `assets/sfx/move/*.mp3` (step, turn, jump, land, lever, hit, attack, dive, splash, teleport) | "[12 Player Movement SFX](https://opengameart.org/content/12-player-movement-sfx)" oleh [leohpaz](https://opengameart.org/users/leohpaz) (via OpenGameArt) | Suara gerakan kesatria, jebakan, monster, dan gagal. Diubah: dikonversi dari WAV ke MP3 dan volumenya dinormalisasi | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| `assets/paper.jpg` (tile 1400px yang dipotong & disambung dari foto asli) | [Olga Thelavart](https://unsplash.com/@olga_o) (via [Unsplash](https://unsplash.com)) | Tekstur kertas/kain UI | [Unsplash License](https://unsplash.com/license) |
 
-**Aset Orisinal:**
-Seluruh elemen lainnya dibuat secara mandiri, meliputi kode program, alur cerita, desain level, ikon blok (SVG), gambar karakter dialog (`assets/portraits/princess.png`, `assets/portraits/knight.png`), model bentuk dasar (putri, monster, golem, papan, tuas, jembatan, gerbang). Semua musik dan efek suara memakai file audio di tabel di atas. Emoji pada dialog dan editor menggunakan font bawaan sistem operasi.
+**Aset buatan tim:**
+Konsep game, cerita, dan rancangan materi edukasi berasal dari dokumen desain tim. Gambar karakter dialog (`assets/portraits/princess.png`, `assets/portraits/knight.png`) dimodelkan dan dirender oleh tim.
+
+**Elemen lain di dalam kode game:**
+- Model 3D sederhana (putri, monster, golem, papan, tuas, jembatan, gerbang, duri) disusun dari bentuk dasar bawaan Three.js (kubus, kapsul, kerucut, silinder, bola) dengan warna polos, tanpa tekstur.
+- Latar animasi (`js/bgfx.js`) adalah shader WebGL di dalam kode game dan bisa dimatikan di Pengaturan → Latar animasi.
+- Semua ikon, audio, font, dan foto tekstur berasal dari sumber berlisensi di tabel di atas.
+
+Emoji pada dialog dan editor menggunakan font bawaan sistem operasi.

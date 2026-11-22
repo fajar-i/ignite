@@ -6,6 +6,7 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { LEVELS } from './levels.js';
 import { initUI } from './ui.js';
 import { BLOCK_INFO } from './blocks-info.js';
+import { CREDITS, TEAM } from './credits.js';
 import { createBackground } from './bgfx.js';
 import {
   initSaves, store, load, remove as removeSaved, activeSlot, setActiveSlot, touch, SLOT_COUNT,
@@ -15,7 +16,7 @@ import { createEditor, newDraft, draftToLevel, encodeDraft, decodeDraft } from '
 import { World, DIRS, CONDITIONS } from './world.js';
 import { interpret, LimitError, fromCompact, newId, bumpId, childLists, countBlocks } from './interpreter.js';
 import {
-  GAME_TITLE, SPEAKERS, PROLOG, EPILOG, STAGE_INTRO, HINTS, FAIL_LINES, WIN_LINES,
+  GAME_TITLE, SPEAKERS, PROLOG, EPILOG, STAGE_INTRO, HINTS, FAIL_LINES, WIN_LINES, EFFECT_LINES,
 } from './story.js';
 
 initSaves(); // pilih slot aktif & migrasi data lama, sebelum ada yang membaca simpanan
@@ -687,6 +688,7 @@ async function animateEvent(ev, token) {
     case 'move':
       sfx(ev.type === 'jump' ? 'jump' : 'step');
       await travel(ev, token);
+      if (ev.type === 'jump') sfx('land');
       break;
     case 'bump':
       sfx('bump');
@@ -711,7 +713,7 @@ async function animateEvent(ev, token) {
     case 'fall':
       sfx(ev.type === 'jump' ? 'jump' : 'step');
       await travel(ev, token);
-      sfx('fall');
+      sfx(ev.river ? 'splash' : 'fall');
       await tween(dur(600), (t) => {
         knight.position.y = H - t * t * 2.6;
         knightBody.rotation.x = t * 0.8;
@@ -755,13 +757,24 @@ const audio = () => (actx ??= new (window.AudioContext || window.webkitAudioCont
 // file: nama file di assets/sfx, gain: volume dasar, rate: kecepatan putar (mengubah nada)
 const SAMPLES = {
   click: { file: 'click.mp3', gain: 0.25 },             // tombol, tambah/geser blok
-  turn:  { file: 'click.mp3', gain: 0.2, rate: 1.25 }, // kesatria berbelok
+  turn:  { file: 'move/turn.mp3', gain: 0.2 },         // kesatria berbelok (langkah rumput)
   eval:  { file: 'click.mp3', gain: 0.2, rate: 1.6 },   // putri menjawab sensor
   chime: { file: 'click.mp3', gain: 0.3, rate: 0.8 },   // tombol Simpan sekarang
   win:   { file: 'win.mp3', gain: 0.7 },                // bab/level selesai
   newcard: { file: 'win.mp3', gain: 0.7 },              // kartu "Blok Baru!" muncul
+  // Gerakan kesatria: "12 Player Movement SFX" oleh leohpaz (CC BY 4.0), dikonversi & dinormalisasi.
+  step:   { file: 'move/step.mp3', gain: 0.3 },         // Maju (langkah batu)
+  jump:   { file: 'move/jump.mp3', gain: 0.35 },        // Lompat
+  land:   { file: 'move/land.mp3', gain: 0.3 },         // mendarat setelah lompat
+  bump:   { file: 'move/land.mp3', gain: 0.35, rate: 0.85 }, // menabrak tembok
+  lever:  { file: 'move/lever.mp3', gain: 0.4 },        // tarik tuas (langkah kayu)
+  trap:   { file: 'move/hit.mp3', gain: 0.4 },          // kena duri
+  caught: { file: 'move/attack.mp3', gain: 0.45 },      // ditangkap monster
+  fall:   { file: 'move/dive.mp3', gain: 0.4 },         // jatuh ke lubang
+  splash: { file: 'move/splash.mp3', gain: 0.45 },      // tercebur sungai racun
+  fail:   { file: 'move/teleport.mp3', gain: 0.3 },     // program gagal, kesatria kembali
 };
-// Belum ada file (sunyi): step, jump, wait, lever, bump, fall, trap, caught, fail.
+// Tanpa suara: wait (diam di tempat).
 const buffers = {};
 let samplesLoading = false;
 function loadSamples() {
@@ -824,8 +837,8 @@ for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, () =>
 const muteIcon = document.getElementById('muteIcon');
 function renderMute() {
   muteIcon.innerHTML = muted
-    ? '<path d="M11 5 6 9H2v6h4l5 4z"/><path d="m22 9-6 6M16 9l6 6"/>'
-    : '<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>';
+    ? '<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" /><line x1="22" x2="16" y1="9" y2="15" /><line x1="16" x2="22" y1="9" y2="15" />' // lucide: volume-x
+    : '<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" /><path d="M16 9a5 5 0 0 1 0 6" /><path d="M19.364 18.364a9 9 0 0 0 0-12.728" />'; // lucide: volume-2
 }
 document.getElementById('btnMute').onclick = () => {
   muted = !muted;
@@ -876,16 +889,17 @@ function rankFor(stars) {
 // ------------------------------------------------------------
 //  Editor blok
 // ------------------------------------------------------------
+// Ikon blok: Lucide (https://lucide.dev, lisensi ISC; lihat assets/licenses/lucide-LICENSE.txt)
 const ICONS = {
-  move: '<path d="M12 19V5M5 12l7-7 7 7"/>',
-  right: '<path d="M4 20v-7a4 4 0 0 1 4-4h12"/><path d="m15 4 5 5-5 5"/>',
-  left: '<path d="M20 20v-7a4 4 0 0 0-4-4H4"/><path d="m9 4-5 5 5 5"/>',
-  jump: '<path d="M4 16a8 8 0 0 1 16 0"/><path d="m16 13 4 3 3-4"/>',
-  repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
-  if: '<path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
-  lever: '<path d="M5 20h14"/><path d="M12 20 17 6"/><circle cx="17.5" cy="5" r="2"/>',
-  wait: '<path d="M6 2h12M6 22h12M7 2c0 6 10 6 10 10S7 16 7 22M17 2c0 6-10 6-10 10s10 4 10 10"/>',
-  call: '<path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1"/><path d="M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/>',
+  move: '<path d="m5 12 7-7 7 7" /><path d="M12 19V5" />', // lucide: arrow-up
+  right: '<polyline points="15 14 20 9 15 4" /><path d="M4 20v-7a4 4 0 0 1 4-4h12" />', // lucide: corner-up-right
+  left: '<polyline points="9 14 4 9 9 4" /><path d="M20 20v-7a4 4 0 0 0-4-4H4" />', // lucide: corner-up-left
+  jump: '<path d="m17 11-5-5-5 5" /><path d="m17 18-5-5-5 5" />', // lucide: chevrons-up
+  repeat: '<path d="m17 2 4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14" /><path d="m7 22-4-4 4-4" /><path d="M21 13v1a4 4 0 0 1-4 4H3" />', // lucide: repeat
+  if: '<path d="M16 3h5v5" /><path d="M8 3H3v5" /><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3" /><path d="m15 9 6-6" />', // lucide: split
+  lever: '<path d="M21 17a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2Z" /><path d="M6 15v-2" /><path d="M12 15V9" /><circle cx="12" cy="6" r="3" />', // lucide: joystick
+  wait: '<path d="M5 22h14" /><path d="M5 2h14" /><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" /><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" />', // lucide: hourglass
+  call: '<path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1" /><path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1" />', // lucide: braces
 };
 const BLOCKS = {
   move: { label: 'Maju', cat: 'move' },
@@ -974,6 +988,7 @@ function deleteNode(id) {
 }
 
 function changed() {
+  failCauseId = null; // program diubah -> tanda "sebab" lama tidak berlaku
   saveProgram();
   renderProgram();
   updateHud();
@@ -1122,6 +1137,7 @@ function renderNode(n, i) {
   const el = document.createElement('div');
   el.className = 'pitem';
   el.dataset.id = n.id;
+  if (n.id === failCauseId) el.classList.add('cause');
   el.draggable = true;
   el.tabIndex = 0;
   el.setAttribute('role', 'listitem');
@@ -1363,6 +1379,7 @@ setInterval(() => {
 // ------------------------------------------------------------
 const runBtn = document.getElementById('btnRun');
 let failCount = 0;
+let failCauseId = null; // blok penyebab kegagalan terakhir (ditandai "Sebab")
 
 function highlight(id) {
   programEl.querySelectorAll('.pitem.running').forEach((e) => e.classList.remove('running'));
@@ -1394,10 +1411,14 @@ async function run() {
   world.reset();
   resetVisual();
   setRunning(true);
+  failCauseId = null;
+  programEl.querySelectorAll('.pitem.cause').forEach((e) => e.classList.remove('cause'));
   let reason = null;
+  let causeId = null, lastId = null;
   try {
     for (const y of interpret(program, fnBody, world)) {
       if (token !== runToken) return;
+      lastId = y.node.id;
       if (y.kind === 'eval') {
         highlight(y.node.id);
         flashEval(y.node.id, y.result);
@@ -1417,6 +1438,7 @@ async function run() {
       syncWorld();
       if (ev.result === 'fall') reason = ev.river ? 'river' : 'fall';
       else if (ev.result === 'trap' || ev.result === 'caught') reason = ev.result;
+      if (reason && causeId == null) causeId = y.node.id;
       await tween(dur(80), () => {}, token);
     }
   } catch (e) {
@@ -1427,15 +1449,29 @@ async function run() {
   highlight(null);
   setRunning(false);
   if (world.status === 'won') onWin();
-  else onFail(reason || 'incomplete');
+  else onFail(reason || 'incomplete', causeId ?? lastId);
 }
 
-function onFail(reason) {
+// Sub-tema "sebab akibat": sebutkan blok penyebab dan akibatnya, lalu tandai bloknya.
+function causeText(reason, id) {
+  const f = id != null ? findNode(id) : null;
+  if (!f) return null;
+  const label = f.node.type === 'call' ? `Panggil ${fnName}` : BLOCKS[f.node.type].label;
+  const where = f.list === fnBody ? ` di Fungsi "${fnName}"` : f.list === program ? '' : ' (di dalam blok lain)';
+  const blok = `blok ${f.index + 1} "${label}"${where}`;
+  return reason === 'incomplete' ? `program berhenti setelah ${blok}` : blok;
+}
+function onFail(reason, causeId) {
   sfx('fail');
   failCount++;
   bumpStat('fails');
   const hint = hintsFor(stage)[Math.min(failCount, 3) - 1];
-  say([['princess', FAIL_LINES[reason]], ['princess', hint]]);
+  const sebab = causeText(reason, causeId);
+  failCauseId = sebab ? causeId : null;
+  if (failCauseId != null) programEl.querySelector(`.pitem[data-id="${failCauseId}"]`)?.classList.add('cause');
+  const lines = [['princess', FAIL_LINES[reason]], ['princess', hint]];
+  if (sebab) lines.unshift(['narrator', `Sebab: ${sebab}. → Akibat: ${EFFECT_LINES[reason]}.`]);
+  say(lines);
 }
 
 function onWin() {
@@ -1460,7 +1496,9 @@ function onWin() {
     `Bagus sekali, ${playerName()}! Waktu menyusun ${fmt(elapsed)} · ${totalBlocks()} blok. "${WIN_LINES[stage.id] ?? 'Level buatanmu berhasil diselesaikan!'}"` +
     (!stage.custom && !keepsCode(stage.id) ? ' Kodemu belum disimpan: susun ulang dari awal untuk meraih 3 bintang!' : '');
   document.getElementById('winEng').innerHTML =
-    `<b>Konsep:</b> ${stage.concept}<br><b>Engineering:</b> ${stage.engineering}`;
+    `<b>Konsep:</b> ${stage.concept}<br><b>Engineering:</b> ${stage.engineering}` +
+    (stage.subtheme ? `<br><b>Sub-tema:</b> ${stage.subtheme}` : '') +
+    '<br><i>Setiap langkah kecilmu adalah sebab; pintu yang terbuka adalah akibatnya.</i>';
   document.getElementById('btnNext').textContent = stage.custom ? 'Edit level ›' : stage.id === LEVELS.length ? 'Epilog ›' : 'Bab berikutnya ›';
   setTimeout(() => { document.getElementById('winOverlay').hidden = false; }, 500);
 }
@@ -1724,7 +1762,8 @@ async function startLevel(lv, { intro = true, introduceBlocks = false } = {}) {
   document.getElementById('btnEditLevel').hidden = !lv.custom;
   document.getElementById('stageSub').textContent = stage.name;
   document.getElementById('concept').innerHTML =
-    `Konsep: <b>${esc(stage.concept)}</b><br>Engineering: <b>${esc(stage.engineering)}</b>`;
+    `Konsep: <b>${esc(stage.concept)}</b><br>Engineering: <b>${esc(stage.engineering)}</b>` +
+    (stage.subtheme ? `<br>Sub-tema: <b>${esc(stage.subtheme)}</b>` : '');
   document.getElementById('clearLabel').textContent = stage.initialProgram ? 'Muat ulang program' : 'Hapus semua';
   buildBoard();
   applyMonsterModels();
@@ -2007,7 +2046,7 @@ function openStages() {
         <button class="run small" data-a="play">Main</button>
         <button class="btn" data-a="edit">Edit</button>
         <button class="btn" data-a="share" title="Salin kode">Kode</button>
-        <button class="btn danger" data-a="del" title="Hapus level"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>
+        <button class="btn danger" data-a="del" title="Hapus level"><svg viewBox="0 0 24 24"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg></button>
       </div>`;
     card.querySelector('[data-a=play]').onclick = () => { stageOverlay.hidden = true; titleEl.hidden = true; audio(); startLevel(draftToLevel(d)); };
     card.querySelector('[data-a=edit]').onclick = () => { audio(); enterEditor(d); };
@@ -2137,6 +2176,23 @@ function openProfile() {
   profileOverlay.hidden = false;
 }
 document.getElementById('btnTitleProfile').onclick = openProfile;
+
+// ---------- Kredit ----------
+const creditsOverlay = document.getElementById('creditsOverlay');
+function openCredits() {
+  const link = (it) => `<a href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">${esc(it.who)}</a>`;
+  const team = TEAM.length
+    ? `<section class="cr-group"><h3>Tim</h3><ul>${TEAM.map((m) =>
+      `<li><b>${esc(m.name)}</b><span>${esc(m.role)}</span></li>`).join('')}</ul></section>`
+    : '';
+  document.getElementById('creditsBody').innerHTML = team + CREDITS.map((g) =>
+    `<section class="cr-group"><h3>${esc(g.group)}</h3><ul>${g.items.map((it) =>
+      `<li><b>${esc(it.what)}</b><span>${link(it)} · ${esc(it.license)}</span></li>`).join('')}</ul></section>`).join('');
+  creditsOverlay.hidden = false;
+}
+document.getElementById('btnTitleCredits').onclick = openCredits;
+document.getElementById('btnCloseCredits').onclick = () => { creditsOverlay.hidden = true; };
+creditsOverlay.onclick = (e) => { if (e.target === creditsOverlay) creditsOverlay.hidden = true; };
 document.getElementById('btnCloseProfile').onclick = () => { profileOverlay.hidden = true; };
 profileOverlay.onclick = (e) => { if (e.target === profileOverlay) profileOverlay.hidden = true; };
 // ---------- slot simpan: muat, profil baru, hapus, simpan, ekspor/impor ----------
@@ -2189,7 +2245,7 @@ function openSlots(mode = 'load') {
             ? '<button class="btn danger" data-a="new">Timpa</button>'
             : `<button class="run small" data-a="load">${isActive ? 'Lanjutkan' : 'Muat'}</button>`}
           <button class="btn danger" data-a="del" aria-label="Hapus profil ${esc(info.name)}" title="Hapus profil">
-            <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>
+            <svg viewBox="0 0 24 24"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg></button>
         </div>`;
     }
     card.querySelector('[data-a=load]')?.addEventListener('click', () => {
@@ -2335,6 +2391,7 @@ settingsOverlay.onclick = (e) => { if (e.target === settingsOverlay) settingsOve
 // "Kembali" (Esc / tombol B): tutup layar teratas, lalu dialog, lalu keluar dari wadah blok.
 function goBack() {
   if (!askEl.hidden) { askResolve?.(null); return; }
+  if (!creditsOverlay.hidden) { creditsOverlay.hidden = true; return; }
   if (!blockOverlay.hidden) { blockCardsDone?.(); return; }
   if (!slotOverlay.hidden) { slotOverlay.hidden = true; return; }
   if (!dialogOverlay.hidden) { closeDialog(); return; }

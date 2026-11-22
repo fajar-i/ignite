@@ -306,8 +306,8 @@ export function createEditor(root, api) {
       <div class="ed-head">
         <h2>Editor Level</h2>
         <div class="ed-history">
-          <button class="btn icon" id="edUndo" title="Urungkan (Ctrl+Z)" aria-label="Urungkan"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
-          <button class="btn icon" id="edRedo" title="Ulangi (Ctrl+Y)" aria-label="Ulangi"><svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
+          <button class="btn icon" id="edUndo" title="Urungkan (Ctrl+Z)" aria-label="Urungkan"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" /></svg></button>
+          <button class="btn icon" id="edRedo" title="Ulangi (Ctrl+Y)" aria-label="Ulangi"><svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5" /><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13" /></svg></button>
         </div>
       </div>
       <div class="ed-status-box" id="edStatus" role="status" aria-live="polite"></div>
