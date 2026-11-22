@@ -711,7 +711,135 @@ function setKnightFlash(v) {
   for (const m of knightMats) { m.emissive.setRGB(v, 0, 0); }
 }
 
+const SENSOR_LABELS = { trap: 'Jebakan', monster: 'Monster', sleep: 'Tidur' };
+const sensorTexCache = new Map();
+function roundRectPath(g, x, y, w, h, r) {
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.lineTo(x + w - r, y);
+  g.quadraticCurveTo(x + w, y, x + w, y + r);
+  g.lineTo(x + w, y + h - r);
+  g.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  g.lineTo(x + r, y + h);
+  g.quadraticCurveTo(x, y + h, x, y + h - r);
+  g.lineTo(x, y + r);
+  g.quadraticCurveTo(x, y, x + r, y);
+  g.closePath();
+}
+function getSensorTexture(cond, result) {
+  const k = `${cond}:${result ? 1 : 0}`;
+  if (sensorTexCache.has(k)) return sensorTexCache.get(k);
+  const c = document.createElement('canvas');
+  c.width = 360; c.height = 124;
+  const g = c.getContext('2d');
+  const ok = !!result;
+  const accent = ok ? '#2f7a44' : '#a8342a';
+  const border = ok ? '#49a863' : '#d65347';
+
+  // gelembung perkamen + ekor panah bawah
+  g.save();
+  g.shadowColor = 'rgba(0,0,0,0.45)';
+  g.shadowBlur = 10;
+  g.shadowOffsetY = 4;
+  roundRectPath(g, 14, 10, 332, 86, 22);
+  g.fillStyle = '#fbf1d6';
+  g.fill();
+  g.restore();
+
+  // ekor kecil menunjuk ke kesatria/putri
+  g.beginPath();
+  g.moveTo(166, 95);
+  g.lineTo(180, 114);
+  g.lineTo(194, 95);
+  g.closePath();
+  g.fillStyle = '#fbf1d6';
+  g.fill();
+
+  // bingkai luar
+  roundRectPath(g, 14, 10, 332, 86, 22);
+  g.lineWidth = 4;
+  g.strokeStyle = border;
+  g.stroke();
+
+  // teks kondisi (kiri)
+  g.fillStyle = '#3b2a1a';
+  g.font = '700 28px "Segoe UI", system-ui, sans-serif';
+  g.textBaseline = 'middle';
+  g.textAlign = 'left';
+  g.fillText(`${SENSOR_LABELS[cond] || cond}?`, 32, 53);
+
+  // pil hasil (kanan: ✓ YA / ✗ TIDAK)
+  roundRectPath(g, 198, 25, 134, 56, 28);
+  g.fillStyle = accent;
+  g.fill();
+  g.fillStyle = '#ffffff';
+  g.font = '800 25px "Segoe UI", system-ui, sans-serif';
+  g.textAlign = 'center';
+  g.fillText(ok ? '✓ YA' : '✗ TIDAK', 265, 54);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  sensorTexCache.set(k, tex);
+  return tex;
+}
+
+const sensorBubbleMat = new THREE.SpriteMaterial({ transparent: true, opacity: 0, depthTest: false, depthWrite: false });
+const sensorBubble = new THREE.Sprite(sensorBubbleMat);
+sensorBubble.visible = false;
+sensorBubble.renderOrder = 10;
+scene.add(sensorBubble);
+
+const sensorRingMat = new THREE.MeshBasicMaterial({
+  color: 0x46b864, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false,
+});
+const sensorRing = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.665, 4), sensorRingMat);
+sensorRing.rotation.set(-Math.PI / 2, 0, Math.PI / 4);
+sensorRing.visible = false;
+sensorRing.renderOrder = 5;
+scene.add(sensorRing);
+
+function hideSensorFx() {
+  sensorBubble.visible = false;
+  sensorRing.visible = false;
+}
+
+async function showSensorEval(cond, result, token) {
+  const reduced = document.body.classList.contains('rm');
+  sensorBubbleMat.map = getSensorTexture(cond, result);
+  sensorBubbleMat.needsUpdate = true;
+  sensorBubble.visible = true;
+
+  const f = world.frontPos();
+  const fc = world.cell(f.x, f.z);
+  const ringY = fc?.kind === 'wall' ? 0.88 : H + 0.025;
+  sensorRingMat.color.setHex(result ? 0x46b864 : 0xd94e43);
+  sensorRing.position.set(worldX(f.x), ringY, worldZ(f.z));
+  sensorRing.visible = true;
+
+  const baseX = knight.position.x;
+  const baseZ = knight.position.z;
+  const baseY = H + 1.56;
+  await tween(dur(360), (t) => {
+    const alpha = reduced
+      ? 1
+      : t < 0.2 ? t / 0.2
+      : t > 0.78 ? Math.max(0, (1 - t) / 0.22)
+      : 1;
+    const pop = reduced ? 1 : t < 0.22 ? lerp(0.62, 1.06, ease(t / 0.22)) : lerp(1.06, 1, Math.min(1, (t - 0.22) / 0.2));
+    const lift = reduced ? 0 : t * 0.14;
+    sensorBubble.position.set(baseX, baseY + lift, baseZ);
+    sensorBubble.scale.set(1.55 * pop, 0.54 * pop, 1);
+    sensorBubbleMat.opacity = alpha;
+
+    const ringScale = reduced ? 1 : 0.94 + Math.sin(Math.PI * t) * 0.1;
+    sensorRing.scale.set(ringScale, ringScale, 1);
+    sensorRingMat.opacity = alpha * 0.8;
+  }, token);
+  hideSensorFx();
+}
+
 function resetVisual() {
+  hideSensorFx();
   placeKnight();
   syncWorld(true);
   for (const g of parts.spikes.values()) g.scale.set(1, 1, 1);
@@ -1600,7 +1728,7 @@ async function run() {
         highlight(y.node.id);
         flashEval(y.node.id, y.result);
         sfx('eval');
-        await tween(dur(280), () => {}, token);
+        await showSensorEval(y.node.cond, y.result, token);
         continue;
       }
       if (y.kind === 'call') {
