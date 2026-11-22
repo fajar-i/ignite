@@ -6,6 +6,7 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { LEVELS } from './levels.js';
 import { initUI } from './ui.js';
 import { BLOCK_INFO } from './blocks-info.js';
+import { createBackground } from './bgfx.js';
 import {
   initSaves, store, load, remove as removeSaved, activeSlot, setActiveSlot, touch, SLOT_COUNT,
   slotInfo, clearSlot, exportSlot, parseSaveFile, importInto,
@@ -46,6 +47,8 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 viewport.prepend(renderer.domElement);
+// Latar shader sihir di belakang dunia 3D (diatur per tema bab).
+const bgfx = createBackground(viewport, { reducedMotion: () => document.body.classList.contains('rm') });
 
 const scene = new THREE.Scene();
 const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
@@ -293,6 +296,7 @@ function buildBoard({ resetCamera = true } = {}) {
 
   // tema
   viewport.style.background = `radial-gradient(ellipse at 50% 40%, ${lighten(th.bg, 0.05).getStyle()}, ${th.bg})`;
+  bgfx.setTheme(th);
   hemi.color.set(lighten(th.light, 0.1));
   lantern.color.set(th.light);
   sun.color.set(lighten(th.light, 0.15));
@@ -811,12 +815,13 @@ const personalize = (text) => String(text).replaceAll('{pemain}', playerName());
 const stats = { runs: 0, wins: 0, fails: 0, ...load('stats', {}) };
 const bumpStat = (k) => { stats[k] = (stats[k] || 0) + 1; store('stats', stats); };
 
-const settings = { text: 'm', music: 60, sfx: 80, contrast: false, motion: false, ...load('settings', {}) };
+const settings = { text: 'm', music: 60, sfx: 80, contrast: false, motion: false, bgfx: true, ...load('settings', {}) };
 const TEXT_SCALE = { s: 0.9, m: 1, l: 1.15, xl: 1.3 };
 function applySettings() {
   document.documentElement.style.setProperty('--fs', TEXT_SCALE[settings.text] || 1);
   document.body.classList.toggle('hc', !!settings.contrast);
   document.body.classList.toggle('rm', !!settings.motion);
+  bgfx.setEnabled(settings.bgfx !== false);
   requestAnimationFrame(resize);
 }
 
@@ -1571,6 +1576,7 @@ async function startLevel(lv, { intro = true, introduceBlocks = false } = {}) {
   highlight(null);
   closeDialog();
   exitEditor();
+  if (stage !== lv) bgfx.boost(); // latar berputar cepat 1 detik saat ganti bab
   stage = lv;
   world = new World(stage);
   if (!lv.custom) store('last', LEVELS.indexOf(lv));
@@ -1703,6 +1709,14 @@ function deleteCustom(id) {
 }
 
 const titleEl = document.getElementById('titleOverlay');
+// Layar utama memakai latar versi berkilau tanpa dunia 3D; saat bermain kembali ke versi tenang.
+function syncTitleBg(instant = false) {
+  const onTitle = !titleEl.hidden;
+  document.body.classList.toggle('on-title', onTitle);
+  bgfx.setPreset(onTitle ? 'menu' : 'game', { instant });
+}
+new MutationObserver(() => syncTitleBg()).observe(titleEl, { attributes: true, attributeFilter: ['hidden'] });
+syncTitleBg(true);
 const stageOverlay = document.getElementById('stageOverlay');
 const winOverlay = document.getElementById('winOverlay');
 
@@ -2153,6 +2167,7 @@ function openSettings() {
   document.getElementById('setSfx').value = settings.sfx;
   document.getElementById('setContrast').checked = settings.contrast;
   document.getElementById('setMotion').checked = settings.motion;
+  document.getElementById('setBgfx').checked = settings.bgfx !== false;
   settingsOverlay.hidden = false;
 }
 const saveSettings = () => { store('settings', settings); applySettings(); };
@@ -2164,6 +2179,7 @@ document.getElementById('setSfx').oninput = (e) => { settings.sfx = +e.target.va
 document.getElementById('setSfx').onchange = () => sfx('click');
 document.getElementById('setContrast').onchange = (e) => { settings.contrast = e.target.checked; saveSettings(); };
 document.getElementById('setMotion').onchange = (e) => { settings.motion = e.target.checked; saveSettings(); };
+document.getElementById('setBgfx').onchange = (e) => { settings.bgfx = e.target.checked; saveSettings(); };
 document.getElementById('btnSettings').onclick = openSettings;
 document.getElementById('btnTitleSettings').onclick = openSettings;
 document.getElementById('btnCloseSettings').onclick = () => { settingsOverlay.hidden = true; };

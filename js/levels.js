@@ -22,7 +22,7 @@ export const LEVELS = [
     limit: null,
     time: 120, stars: [60, 90, 110],
     theme: {
-      bg: '#1c1a24', top: '#4f4757', side: '#2f2a36', wall: '#3d3545', light: 0xffb070,
+      bg: '#1c1a24', sky: 'senja', top: '#4f4757', side: '#2f2a36', wall: '#3d3545', light: 0xffb070,
       music: { root: 57, tempo: 70, notes: [0, 3, 7, 3, 10, 7, 3, null, 0, 5, 8, 5, 7, null, 3, null] },
     },
     map: [
@@ -45,7 +45,7 @@ export const LEVELS = [
     limit: 6,
     time: 120, stars: [60, 90, 110],
     theme: {
-      bg: '#221b14', top: '#5c4a36', side: '#3a2c1f', wall: '#5a3622', light: 0xffe2b0,
+      bg: '#221b14', sky: 'biru', top: '#5c4a36', side: '#3a2c1f', wall: '#5a3622', light: 0xffe2b0,
       music: { root: 62, tempo: 80, notes: [0, 7, 12, 7, 9, 5, 9, null, 2, 9, 14, 9, 7, 4, 0, null] },
     },
     map: [
@@ -67,7 +67,7 @@ export const LEVELS = [
     monsterKind: 'monster',
     monsterCycle: { awake: 2, sleep: 2 },
     theme: {
-      bg: '#162026', top: '#5d6368', side: '#363c41', wall: '#7a6430', light: 0xdde6ff,
+      bg: '#162026', sky: 'perak', top: '#5d6368', side: '#363c41', wall: '#7a6430', light: 0xdde6ff,
       music: { root: 60, tempo: 100, notes: [0, null, 7, null, 0, null, 7, 6, 0, null, 7, null, 3, null, 2, null] },
     },
     map: [
@@ -90,7 +90,7 @@ export const LEVELS = [
     time: 180, stars: [90, 135, 170],
     fnName: 'Seberangi',
     theme: {
-      bg: '#0d1714', top: '#3d4c43', side: '#25302a', wall: '#2b3530', river: '#2fae5c', light: 0xa8ffcc,
+      bg: '#0d1714', sky: 'rimba', top: '#3d4c43', side: '#25302a', wall: '#2b3530', river: '#2fae5c', light: 0xa8ffcc,
       music: { root: 55, tempo: 62, notes: [0, null, 3, null, 2, null, -2, null, 0, null, 7, null, 5, 3, 2, null] },
     },
     map: [
@@ -118,7 +118,7 @@ export const LEVELS = [
     monsterKind: 'golem',
     monsterCycle: { awake: 2, sleep: 2 },
     theme: {
-      bg: '#2a2238', top: '#6e6658', side: '#463f36', wall: '#7a6f62', river: '#2d6cdf', light: 0xffc9a0,
+      bg: '#2a2238', sky: 'mawar', top: '#6e6658', side: '#463f36', wall: '#7a6f62', river: '#2d6cdf', light: 0xffc9a0,
       music: { root: 60, tempo: 112, notes: [0, 4, 7, 12, 7, 4, 9, 7, 5, 9, 12, 9, 7, 11, 14, null] },
     },
     map: [

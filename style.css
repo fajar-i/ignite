@@ -1,3 +1,18 @@
+/* Font lokal (CC BY-SA 4.0, lihat readme). Masing-masing satu ketebalan: rentang weight mencegah bold palsu. */
+@font-face {
+  font-family: "Nodesto Caps Condensed";
+  src: url("assets/fonts/NodestoCapsCondensed-Bold.otf") format("opentype");
+  font-weight: 100 900; font-style: normal; font-display: swap;
+  /* Nodesto sempit (lebar ~67% Cinzel): diperbesar agar heading tidak terlihat mengecil. */
+  size-adjust: 150%;
+}
+/* Huruf hias awal (drop cap); hanya berisi huruf A-Z. */
+@font-face {
+  font-family: "Solbera Imitation";
+  src: url("assets/fonts/SolberaImitation.otf") format("opentype");
+  font-weight: 100 900; font-style: normal; font-display: swap;
+}
+
 /* ============================================================
    Mata Sang Kesatria — tema storybook (perkamen & lilin merah)
    Semua ukuran memakai rem -> ikut pengaturan "Ukuran teks".
@@ -42,8 +57,9 @@
      multiply/darken = serat gelap di area terang; screen/lighten = serat terang;
      overlay/soft-light = kontras seimbang. */
   --tex-blend: multiply;
-  --title-font: "Cinzel", "Times New Roman", serif;
+  --title-font: "Nodesto Caps Condensed", "Cinzel", "Times New Roman", serif;
   --body-font: "Lora", Georgia, serif;
+  --initial-font: "Solbera Imitation", var(--title-font);
 }
 
 html { font-size: calc(clamp(15px, 0.45vw + 9.5px, 20px) * var(--fs)); }
@@ -117,6 +133,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* ---------- layout: dunia penuh layar ---------- */
 .viewport { position: fixed; inset: 0; transition: background 0.6s; }
 .viewport canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+.viewport canvas { position: relative; }
+.viewport canvas.bgfx { position: absolute; inset: 0; pointer-events: none; cursor: default; }
+.viewport canvas.bgfx[hidden] { display: none; }
 .viewport canvas:active { cursor: grabbing; }
 .viewport::after { /* vinyet sepia ala ilustrasi buku */
   content: ""; position: absolute; inset: 0; pointer-events: none;
@@ -327,7 +346,11 @@ input[type=range] { width: 100%; accent-color: var(--wax); }
 .empty-custom { grid-column: 1 / -1; font-size: 0.9rem; margin: 0; font-style: italic; }
 
 /* ---------- sampul buku ---------- */
-.title-screen { background: radial-gradient(ellipse at 50% 35%, #4a3020, #120a05 75%); backdrop-filter: none; }
+.title-screen { background: radial-gradient(ellipse at 50% 45%, transparent 35%, #0a050399 100%); backdrop-filter: none; }
+/* Layar utama: latar shader penuh layar, dunia 3D disembunyikan */
+body.on-title .viewport { height: auto; bottom: 0; background: #0e0920; }
+body.on-title .viewport canvas:not(.bgfx) { visibility: hidden; }
+body.on-title .app { visibility: hidden; }
 .title-card { width: min(34rem, 100%); padding: 2.2rem 2.4rem 1.6rem; text-align: center; animation: rise 0.6s ease-out; }
 @keyframes rise { from { transform: translateY(1rem); opacity: 0; } }
 .ornament { font-size: 0.9rem; letter-spacing: 0.6rem; color: var(--gold); line-height: 1; padding-left: 0.6rem; }
@@ -360,8 +383,8 @@ input[type=range] { width: 100%; accent-color: var(--wax); }
 .story-label::before, .story-label::after { content: " ✦ "; color: var(--gold); }
 .story-text { font-size: clamp(1.05rem, 2.2vw, 1.3rem); line-height: 1.75; min-height: 7em; margin: 0 0 1.4rem; animation: fade 0.5s; }
 .story-text::first-letter {
-  font-family: var(--title-font); font-weight: 900; float: left; font-size: 3.2em; line-height: 0.9;
-  margin: 0.08em 0.12em 0 0; color: var(--wax);
+  font-family: var(--initial-font); font-weight: 400; float: left; font-size: 3.4em; line-height: 0.85;
+  margin: 0.06em 0.14em 0 0; color: var(--wax);
 }
 @keyframes fade { from { opacity: 0; } }
 .story-actions { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; border-top: 1px solid var(--ink-faint); padding-top: 0.9rem; }
