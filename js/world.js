@@ -142,12 +142,9 @@ export class World {
       const midM = this.monsterAt(mid.x, mid.z);
       if (this.isBlocked(mc)) ev.result = 'bump';
       else if (midM) {
-        if (this.isGolem) {
-          if (this.asleep(midM)) ev = { ...ev, ...this.enter(land.x, land.z) };
-          else { ev.result = 'caught'; ev.monster = this.monsters.indexOf(midM); }
-        } else {
-          ev.result = 'bump';
-        }
+        // monster/golem tidur: lompati. Yang bangun menangkap kesatria (sensor wajib dipakai).
+        if (this.asleep(midM)) ev = { ...ev, ...this.enter(land.x, land.z) };
+        else { ev.result = 'caught'; ev.monster = this.monsters.indexOf(midM); }
       } else ev = { ...ev, ...this.enter(land.x, land.z) };
     }
     ev.to = { x: this.x, z: this.z };
@@ -158,6 +155,12 @@ export class World {
         ev.result = 'caught';
         ev.monster = this.monsters.indexOf(curM);
       }
+    }
+    // Monster yang sedang tertidur tidak terbangun selama kesatria berdiri di petaknya:
+    // fasenya ditahan (offset digeser) agar tick berikutnya tidak memajukan siklusnya.
+    const period = this.cycle.awake + this.cycle.sleep;
+    for (const m of this.monsters) {
+      if (m.x === this.x && m.z === this.z && this.asleep(m)) m.offset = (m.offset + period - 1) % period;
     }
     this.tick++;
     if (['caught', 'fall', 'trap'].includes(ev.result)) this.status = 'lost';

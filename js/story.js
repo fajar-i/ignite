@@ -66,7 +66,8 @@ export const STAGE_INTRO = {
   3: [
     ['knight', 'Bunyi detak ini... roda gigi. Semua ini mesin buatan manusia.'],
     ['princess', 'Ada monster penjaga. Mereka bergantian tidur dan bangun, dan aku tidak bisa menebak kapan.'],
-    ['princess', 'Aku akan melaporkan apa yang kulihat. Gunakan Jika: kalau monster tidur, lewat. Kalau bangun, tunggu.'],
+    ['princess', 'Aku akan melaporkan apa yang kulihat. Gunakan Jika: kalau monster tertidur, lompati dengan Lompat. Kalau bangun, Tunggu.'],
+    ['princess', 'Jangan melompat saat monster bangun. Ia akan menangkapmu! Tanyakan dulu padaku apakah ia tertidur.'],
     ['princess', 'Sudah lama sekali aku mendengar detak jam ini. ...Enam bulan, maksudku.'],
   ],
   4: [
@@ -78,7 +79,7 @@ export const STAGE_INTRO = {
   ],
   5: [
     ['princess', 'Gerbang kastil! Tapi ada golem batu yang berjaga, dan jembatan angkatnya macet.'],
-    ['princess', 'Hati-hati—berbeda dari monster biasa, tubuh golem batu terlalu besar untuk dilewati dengan Maju. Saat ia tertidur, kita harus melompatinya dengan Lompat!'],
+    ['princess', 'Hati-hati—tubuh golem batu terlalu besar untuk dilewati dengan Maju. Sama seperti monster di ruang mesin jam: saat ia tertidur, lompati dengan Lompat!'],
     ['princess', 'Aku sudah menyusun rencana, tapi sepertinya ada yang keliru. Coba jalankan, lalu perbaiki bagian yang salah.'],
     ['princess', 'Sedikit lagi. Sedikit lagi aku bebas... kita bebas.'],
   ],
@@ -97,8 +98,8 @@ export const HINTS = {
     'Ulangi 4 kali { Maju, Lompat }, lalu satu Maju terakhir ke pintu.',
   ],
   3: [
-    'Monster bangun dan tidur secara acak. Jangan menghafal waktu; tanyakan padaku setiap langkah.',
-    'Jika ada monster di depan: Jika monster tertidur, Maju; lainnya Tunggu. Jika tidak ada monster: Jika ada jebakan, Lompat; lainnya Maju.',
+    'Monster bangun dan tidur secara acak. Jangan menghafal waktu; tanyakan padaku setiap langkah. Monster yang tertidur dilompati.',
+    'Jika ada monster di depan: Jika monster tertidur, Lompat; lainnya Tunggu. Jika tidak ada monster: Jika ada jebakan, Lompat; lainnya Maju.',
     'Bungkus satu "langkah aman" dalam Ulangi 10 kali. Setelah itu: Tarik Tuas, Belok Kanan, Maju, Maju, Belok Kanan, lalu langkah aman lagi.',
   ],
   4: [
@@ -117,7 +118,7 @@ export const FAIL_LINES = {
   fall: 'Hati-hati! Kita jatuh. Petak itu tidak punya pijakan.',
   river: 'Racun! Petak itu air, bukan jembatan. Apakah tuasnya sudah ditarik?',
   trap: 'Aduh, duri! Gunakan Lompat untuk melewatinya.',
-  caught: 'Monster itu bangun dan menangkap kita! Tunggu sampai ia tertidur.',
+  caught: 'Monster itu bangun dan menangkap kita! Tunggu sampai ia tertidur, lalu lompati.',
   golem: 'Golem batu terlalu besar untuk dilewati dengan Maju! Gunakan Lompat saat ia tertidur.',
   incomplete: 'Perintahnya habis, tapi kita belum sampai di pintu keluar.',
   steps: 'Perintahnya terlalu panjang atau berputar terus. Periksa perulanganmu.',

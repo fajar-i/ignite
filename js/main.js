@@ -135,6 +135,65 @@ function resize() {
 new ResizeObserver(resize).observe(viewport);
 window.addEventListener('resize', resize);
 
+// ---------- lebar panel perintah bisa diseret (desktop) ----------
+(() => {
+  const handle = document.getElementById('panelResizer');
+  const panel = document.querySelector('.code-panel');
+  if (!handle || !panel) return;
+  const root = document.documentElement;
+  const KEY = 'kesatria.panelW';
+  const rem = () => parseFloat(getComputedStyle(root).fontSize) || 16;
+  const clampW = (px) => Math.round(Math.min(Math.max(px, rem() * 20), Math.min(rem() * 44, window.innerWidth * 0.6)));
+  let raf = 0;
+  const apply = (px, save = true) => {
+    if (px == null) root.style.removeProperty('--panel-w-user');
+    else root.style.setProperty('--panel-w-user', clampW(px) + 'px');
+    handle.setAttribute('aria-valuenow', String(Math.round(panel.offsetWidth)));
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(resize);
+    if (save) {
+      try { px == null ? localStorage.removeItem(KEY) : localStorage.setItem(KEY, String(clampW(px))); } catch { /* penyimpanan tidak tersedia */ }
+    }
+  };
+  try { const saved = Number(localStorage.getItem(KEY)); if (saved > 0) apply(saved, false); } catch { /* abaikan */ }
+
+  handle.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add('dragging');
+    document.body.classList.add('panel-dragging');
+    const right = panel.getBoundingClientRect().right;
+    const move = (ev) => apply(right - ev.clientX, false);
+    const up = (ev) => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', up);
+      handle.removeEventListener('pointercancel', up);
+      handle.classList.remove('dragging');
+      document.body.classList.remove('panel-dragging');
+      apply(right - ev.clientX);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up);
+    handle.addEventListener('pointercancel', up);
+  });
+  handle.addEventListener('dblclick', () => apply(null));
+  handle.addEventListener('keydown', (e) => {
+    const step = e.shiftKey ? 64 : 16;
+    if (e.key === 'ArrowLeft') apply(panel.offsetWidth + step);
+    else if (e.key === 'ArrowRight') apply(panel.offsetWidth - step);
+    else if (e.key === 'Home') apply(null);
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  // jaga batas saat jendela mengecil
+  window.addEventListener('resize', () => {
+    const cur = parseFloat(root.style.getPropertyValue('--panel-w-user'));
+    if (cur && clampW(cur) !== cur) apply(cur, false);
+  });
+})();
+
 // ------------------------------------------------------------
 //  State game
 // ------------------------------------------------------------
@@ -1624,42 +1683,6 @@ function renderList(list, listId) {
     activeList = listId;
     renderProgram();
   });
-  el.addEventListener('dragover', (e) => {
-    if (!drag) return;
-    e.stopPropagation();
-    if (drag.kind === 'move') {
-      const f = findNode(drag.id);
-      if (f && containsList(f.node, listId)) { dropGhost?.remove(); ghostKey = ''; return; } // tidak boleh masuk ke dirinya sendiri
-    }
-    e.preventDefault();
-    e.dataTransfer.dropEffect = drag.kind === 'new' ? 'copy' : 'move';
-    showDropLine(el, dropIndex(el, e.clientY));
-  });
-  el.addEventListener('drop', (e) => {
-    if (!drag) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const idx = dropIndex(el, e.clientY);
-    const target = getList(listId);
-    if (drag.kind === 'new') {
-      if (canAdd()) {
-        const n = newNode(drag.type);
-        target.splice(idx, 0, n);
-        if (n.type === 'repeat') activeList = String(n.id);
-        if (n.type === 'if') activeList = `${n.id}:then`;
-      }
-    } else {
-      const f = findNode(drag.id);
-      if (f) {
-        let i = idx;
-        if (f.list === target && f.index < idx) i--;
-        f.list.splice(f.index, 1);
-        target.splice(i, 0, f.node);
-      }
-    }
-    endDrag();
-    changed();
-  });
   return el;
 }
 
@@ -1797,8 +1820,79 @@ function showDropLine(listEl, idx) {
   const before = items[idx] || null;
   if (dropGhost.parentNode !== listEl || dropGhost.nextSibling !== before) listEl.insertBefore(dropGhost, before);
 }
+// Satu penentu target untuk seluruh panel program (bukan dragover per daftar).
+// Tata letak diukur SEKALI saat seret dimulai (sebelum ada bayangan) dan disimpan relatif
+// terhadap isi panel. Bayangan yang menggeser layout tidak memengaruhi target, dan bayangan
+// tidak perlu dilepas-pasang (yang memutar ulang animasinya = berkedip).
+let dropTarget = null; // { listEl, idx }
+let dropMap = null;    // snapshot: [{ el, l, t, r, b, mids: [] }] dalam koordinat isi panel
+function buildDropMap() {
+  const pr = programEl.getBoundingClientRect();
+  const ox = pr.left, oy = pr.top - programEl.scrollTop;
+  const moving = drag?.kind === 'move' ? findNode(drag.id) : null;
+  dropMap = [];
+  for (const el of programEl.querySelectorAll('.plist')) {
+    if (moving && containsList(moving.node, el.dataset.list)) continue; // tidak boleh masuk ke dirinya sendiri
+    const r = el.getBoundingClientRect();
+    const mids = [...el.children].filter((c) => c.classList.contains('pitem'))
+      .map((c) => { const cr = c.getBoundingClientRect(); return cr.top + cr.height / 2 - oy; });
+    dropMap.push({ el, l: r.left - ox, t: r.top - oy, r: r.right - ox, b: r.bottom - oy, mids });
+  }
+}
+function pickDropTarget(x, y) {
+  const pr = programEl.getBoundingClientRect();
+  if (x < pr.left || x > pr.right || y < pr.top || y > pr.bottom) return null;
+  if (!dropMap) buildDropMap();
+  const px = x - pr.left, py = y - pr.top + programEl.scrollTop;
+  let best = null;
+  for (const m of dropMap) if (px >= m.l && px <= m.r && py >= m.t && py <= m.b) best = m; // terakhir = terdalam
+  if (!best) best = dropMap.find((m) => m.el.parentElement?.classList.contains('main-wrap')) || null; // celah panel
+  if (!best) return null;
+  let idx = best.mids.findIndex((mid) => py < mid);
+  if (idx < 0) idx = best.mids.length;
+  return { listEl: best.el, idx };
+}
+programEl.addEventListener('dragover', (e) => {
+  if (!drag) return;
+  const t = pickDropTarget(e.clientX, e.clientY);
+  if (!t) return; // biarkan dokumen menangani (hapus)
+  e.preventDefault();
+  e.stopPropagation();
+  e.dataTransfer.dropEffect = drag.kind === 'new' ? 'copy' : 'move';
+  dropTarget = t;
+  showDropLine(t.listEl, t.idx);
+});
+programEl.addEventListener('drop', (e) => {
+  if (!drag) return;
+  const t = dropTarget;
+  if (!t) return; // ditangani dokumen
+  e.preventDefault();
+  e.stopPropagation();
+  const listId = t.listEl.dataset.list, idx = t.idx;
+  const target = getList(listId);
+  if (drag.kind === 'new') {
+    if (canAdd()) {
+      const n = newNode(drag.type);
+      target.splice(idx, 0, n);
+      if (n.type === 'repeat') activeList = String(n.id);
+      if (n.type === 'if') activeList = `${n.id}:then`;
+    }
+  } else {
+    const f = findNode(drag.id);
+    if (f && !containsList(f.node, listId)) {
+      let i = idx;
+      if (f.list === target && f.index < idx) i--;
+      f.list.splice(f.index, 1);
+      target.splice(i, 0, f.node);
+    }
+  }
+  endDrag();
+  changed();
+});
 function endDrag() {
   drag = null;
+  dropTarget = null;
+  dropMap = null;
   ghostKey = '';
   dropGhost?.remove();
   programEl.classList.remove('will-delete');
@@ -1810,6 +1904,7 @@ document.addEventListener('dragover', (e) => {
   e.preventDefault();
   dropGhost?.remove();
   ghostKey = '';
+  dropTarget = null;
   programEl.classList.add('will-delete');
 });
 document.addEventListener('drop', (e) => {
@@ -2316,7 +2411,7 @@ async function playEpilog({ finishLabel = 'Kembali ke Sampul' } = {}) {
 const CUSTOM_HINTS = [
   'Putar kamera dengan menyeret untuk melihat peta dari sudut lain. Rencanakan jalurnya dulu.',
   'Pecah jalur menjadi bagian kecil. Ada pola yang berulang? Gunakan Ulangi atau Fungsi.',
-  'Kalau ada monster, tanyakan padaku: Jika monster tertidur, Maju; lainnya Tunggu.',
+  'Kalau ada monster, tanyakan padaku: Jika monster tertidur, Lompat; lainnya Tunggu.',
 ];
 const hintsFor = (lv) => HINTS[lv.id] || CUSTOM_HINTS;
 

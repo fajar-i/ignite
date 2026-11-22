@@ -46,7 +46,7 @@
    ============================================================ */
 :root {
   --fs: 1;
-  --panel-w: 25rem;
+  --panel-w: var(--panel-w-user, 25rem); /* --panel-w-user diisi saat panel diseret */
   --gap: 1rem;
   --sa-t: env(safe-area-inset-top, 0px);
   --sa-r: env(safe-area-inset-right, 0px);
@@ -188,7 +188,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .hud { display: flex; gap: 0.4rem; flex-wrap: wrap; padding-top: 0.35rem; }
 .chip {
   background: var(--paper-3); border: 1px solid var(--paper-edge); border-radius: 999px;
-  padding: 0.25rem 0.75rem; font-size: 0.92rem; font-weight: 700; font-variant-numeric: tabular-nums;
+  padding: 0.25rem 0.75rem; font-size: 0.92rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap;
   box-shadow: 0 3px 10px #0007;
 }
 .chip.warn { color: #8a5a00; border-color: var(--gold); background: #fff1c8; }
@@ -264,6 +264,22 @@ button { font: inherit; color: inherit; cursor: pointer; }
   padding: 1.2rem 1.3rem 1.2rem; display: flex; flex-direction: column; min-height: 0;
   overflow-y: auto; overflow-x: hidden; /* layar pendek: panel bergulir, isi tidak menumpuk */
 }
+/* pegangan seret lebar panel: garis tipis di tepi kiri panel */
+.panel-resizer {
+  position: absolute; z-index: 4; touch-action: none; cursor: ew-resize;
+  top: calc(var(--gap) + var(--sa-t) + 1rem); bottom: calc(var(--gap) + var(--sa-b) + 1rem);
+  right: calc(var(--panel-w) + var(--gap) + var(--sa-r) - 0.45rem); width: 0.9rem;
+  display: grid; place-items: center;
+}
+.panel-resizer::before {
+  content: ""; width: 4px; height: 3.2rem; border-radius: 4px;
+  background: #f3e6c855; box-shadow: 0 0 0 1px #0005; transition: background 0.15s, height 0.15s;
+}
+.panel-resizer:hover::before, .panel-resizer:focus-visible::before, .panel-resizer.dragging::before {
+  background: var(--gold); height: 5rem;
+}
+.panel-resizer:focus-visible { outline: none; }
+body.panel-dragging, body.panel-dragging * { cursor: ew-resize !important; user-select: none !important; }
 .panel-title {
   font-family: var(--title-font); font-weight: 700; font-size: 1.1rem; letter-spacing: 0.08em; margin: 0;
   color: var(--ink);
@@ -805,6 +821,7 @@ body.rf .story-text::first-letter { font-weight: 700; }
 /* ---------- layar kecil / HP ---------- */
 @media (max-width: 900px) {
   :root { --panel-w: 100%; --gap: 0.6rem; }
+  .panel-resizer { display: none; }
   body { overflow: hidden; }
   .viewport { bottom: auto; height: 52vh; }
   .code-panel { top: calc(52vh + 0.4rem); left: calc(var(--gap) + var(--sa-l)); right: calc(var(--gap) + var(--sa-r)); width: auto; padding: 0.9rem; }

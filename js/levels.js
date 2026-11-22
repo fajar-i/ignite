@@ -7,15 +7,12 @@
 // ============================================================
 
 // Langkah aman satu petak: dipakai di Stage 3.
+// Langkah aman: monster/golem yang tertidur dilompati; yang bangun ditunggu.
 const STEP_SAFE = ['jika', 'monster',
-  [['jika', 'sleep', ['maju'], ['tunggu']]],
-  [['jika', 'trap', ['lompat'], ['maju']]],
-];
-// Langkah aman untuk golem (Bab 5): golem yang tertidur harus dilompati, bukan Maju.
-const STEP_SAFE_GOLEM = ['jika', 'monster',
   [['jika', 'sleep', ['lompat'], ['tunggu']]],
   [['jika', 'trap', ['lompat'], ['maju']]],
 ];
+const STEP_SAFE_GOLEM = STEP_SAFE;
 
 export const LEVELS = [
   {
