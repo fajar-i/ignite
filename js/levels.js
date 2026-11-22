@@ -21,7 +21,7 @@ export const LEVELS = [
     subtheme: 'Satu langkah kecil: setiap blok adalah satu langkah kesatria',
     blocks: ['move', 'left', 'right'],
     limit: null,
-    time: 120, stars: [60, 90, 110],
+    time: 195, stars: [75, 120, 180],
     theme: {
       bg: '#1c1a24', sky: 'senja', top: '#4f4757', side: '#2f2a36', wall: '#3d3545', light: 0xffb070,
       music: { root: 57, tempo: 70, notes: [0, 3, 7, 3, 10, 7, 3, null, 0, 5, 8, 5, 7, null, 3, null] },
@@ -45,7 +45,7 @@ export const LEVELS = [
     subtheme: 'Satu langkah kecil, diulang: pola kecil membangun jalan panjang',
     blocks: ['move', 'left', 'right', 'jump', 'repeat'],
     limit: 6,
-    time: 120, stars: [60, 90, 110],
+    time: 195, stars: [75, 120, 180],
     theme: {
       bg: '#221b14', sky: 'biru', top: '#5c4a36', side: '#3a2c1f', wall: '#5a3622', light: 0xffe2b0,
       music: { root: 62, tempo: 80, notes: [0, 7, 12, 7, 9, 5, 9, null, 2, 9, 14, 9, 7, 4, 0, null] },
@@ -66,7 +66,7 @@ export const LEVELS = [
     subtheme: 'Sebab akibat: hasil sensor (sebab) menentukan tindakan (akibat)',
     blocks: ['move', 'left', 'right', 'jump', 'repeat', 'if', 'lever', 'wait'],
     limit: null,
-    time: 150, stars: [75, 110, 140],
+    time: 300, stars: [120, 180, 270],
     monsterKind: 'monster',
     monsterCycle: { awake: 2, sleep: 2 },
     theme: {
@@ -91,7 +91,7 @@ export const LEVELS = [
     subtheme: 'Sebab akibat: tarik tuas (sebab), jembatan turun (akibat)',
     blocks: ['move', 'left', 'right', 'jump', 'repeat', 'if', 'lever', 'wait', 'call'],
     limit: 13,
-    time: 180, stars: [90, 135, 170],
+    time: 300, stars: [120, 180, 270],
     fnName: 'Seberangi',
     theme: {
       bg: '#0d1714', sky: 'rimba', top: '#3d4c43', side: '#25302a', wall: '#2b3530', river: '#2fae5c', light: 0xa8ffcc,
@@ -119,7 +119,7 @@ export const LEVELS = [
     subtheme: 'Sebab akibat: telusuri akibat yang salah kembali ke sebabnya',
     blocks: ['move', 'left', 'right', 'jump', 'repeat', 'if', 'lever', 'wait', 'call'],
     limit: null,
-    time: 240, stars: [120, 180, 225],
+    time: 360, stars: [150, 225, 330],
     monsterKind: 'golem',
     monsterCycle: { awake: 2, sleep: 2 },
     theme: {
