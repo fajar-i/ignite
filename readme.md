@@ -41,4 +41,4 @@ node tools/validate.mjs
 | `assets/paper.jpg` (tile 640px dari foto asli) | [Smithsonian](https://unsplash.com/@smithsonian) & [Olga Thelavart](https://unsplash.com/@olga_o) (via [Unsplash](https://unsplash.com)) | Tekstur kertas/kain UI | [Unsplash License](https://unsplash.com/license) |
 
 **Aset Orisinal:**
-Seluruh elemen lainnya dibuat secara mandiri, meliputi kode program, alur cerita, desain level, ikon blok (SVG), model bentuk dasar (putri, monster, golem, papan, tuas, jembatan, gerbang). Semua musik dan efek suara memakai file audio di tabel di atas. Emoji pada dialog dan editor menggunakan font bawaan sistem operasi.
+Seluruh elemen lainnya dibuat secara mandiri, meliputi kode program, alur cerita, desain level, ikon blok (SVG), gambar karakter dialog (`assets/portraits/princess.png`, `assets/portraits/knight.png`), model bentuk dasar (putri, monster, golem, papan, tuas, jembatan, gerbang). Semua musik dan efek suara memakai file audio di tabel di atas. Emoji pada dialog dan editor menggunakan font bawaan sistem operasi.
