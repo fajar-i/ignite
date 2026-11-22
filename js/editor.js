@@ -157,8 +157,10 @@ export function analyze(d) {
   const warns = [];
   const leverIds = new Set(def.levers.values());
 
+  const isGolem = lv.monsterKind === 'golem';
   if (def.monsters.length && !allow.has('if')) warns.push('Ada monster, tapi blok Jika tidak tersedia. Monster bangun/tidur acak, jadi pemain butuh sensor.');
   if (def.monsters.length && !allow.has('wait')) warns.push('Ada monster, tapi blok Tunggu tidak tersedia.');
+  if (def.monsters.length && isGolem && !allow.has('jump')) warns.push('Ada golem, tapi blok Lompat tidak tersedia. Golem yang tertidur harus dilompati.');
   if (leverIds.size && !allow.has('lever')) warns.push('Ada tuas, tapi blok Tarik Tuas tidak tersedia.');
   const linked = new Set();
   def.cells.flat().forEach((c) => { if (c.kind === 'bridge' || c.kind === 'gate') linked.add(c.id); });
@@ -170,14 +172,15 @@ export function analyze(d) {
   const stand = (x, z) => {
     const c = cell(x, z);
     if (!c) return false;
-    if (isMon(x, z) && !allow.has('if')) return false;
+    if (isMon(x, z) && (isGolem || !allow.has('if'))) return false;
     if (c.kind === 'floor') return true;
     if (c.kind === 'bridge' || c.kind === 'gate') return open.has(c.id);
     return false;
   };
   const blocksJump = (x, z) => {
     const c = cell(x, z);
-    return !c || c.kind === 'wall' || (c.kind === 'gate' && !open.has(c.id)) || isMon(x, z);
+    const monBlocks = isMon(x, z) && (!isGolem || !allow.has('if'));
+    return !c || c.kind === 'wall' || (c.kind === 'gate' && !open.has(c.id)) || monBlocks;
   };
   const seen = new Set([`${def.start.x},${def.start.z}`]);
   const queue = [def.start];
@@ -335,7 +338,7 @@ export function createEditor(root, api) {
           <label><span>Tema</span><select id="edTheme">${LEVELS.map((l, i) => `<option value="${i}">${esc(l.name)}</option>`).join('')}</select></label>
           <label><span>Waktu (detik)</span><input id="edTime" type="number" min="30" max="600" step="10"></label>
           <label><span>Batas blok (0 = bebas)</span><input id="edLimit" type="number" min="0" max="99"></label>
-          <label><span>Jenis monster</span><select id="edKind"><option value="monster">Monster</option><option value="golem">Golem</option></select></label>
+          <label><span>Jenis monster</span><select id="edKind"><option value="monster">Monster</option><option value="golem">Golem (lompati saat tidur)</option></select></label>
           <label><span>Bangun / tidur (giliran)</span><span class="ed-pair"><input id="edAwake" type="number" min="1" max="6" aria-label="Giliran bangun"><input id="edSleep" type="number" min="1" max="6" aria-label="Giliran tidur"></span></label>
         </div>
         <div class="ed-label">Blok yang tersedia</div>

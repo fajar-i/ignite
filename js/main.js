@@ -988,6 +988,7 @@ async function animateEvent(ev, token) {
       if (ev.type === 'jump') sfx('land');
       break;
     case 'bump':
+      if (ev.golem) showToast('Golem batu menghalangi! Gunakan Lompat saat ia tertidur.');
       sfx('bump');
       await bump(token);
       break;
@@ -1334,6 +1335,7 @@ function renderProgram(focusId) {
     main.insertAdjacentHTML('beforeend', `<div class="plan-note">
       <button class="note-close" type="button" title="Tutup catatan" aria-label="Tutup catatan">×</button>
       <b>Rencana dari putri</b> — berisi 3 bug, bukan kodemu dari bab lain.
+      Ingat: <b>golem batu harus dilompati saat tertidur</b> (bukan Maju).
       Jalankan, lihat di mana kesatria gagal, lalu perbaiki.
       <span>Tombol "Muat ulang program" mengembalikan rencana ini.</span></div>`);
     // Ditutup sekali = tidak muncul lagi untuk bab ini (per slot simpan).
@@ -1719,7 +1721,7 @@ async function run() {
   failCauseId = null;
   programEl.querySelectorAll('.pitem.cause').forEach((e) => e.classList.remove('cause'));
   let reason = null;
-  let causeId = null, lastId = null;
+  let causeId = null, lastId = null, golemBumpId = null;
   try {
     for (const y of interpret(program, fnBody, world)) {
       if (token !== runToken) return;
@@ -1741,6 +1743,7 @@ async function run() {
       await animateEvent(ev, token);
       if (token !== runToken) return;
       syncWorld();
+      if (ev.golem && golemBumpId == null) golemBumpId = y.node.id;
       if (ev.result === 'fall') reason = ev.river ? 'river' : 'fall';
       else if (ev.result === 'trap' || ev.result === 'caught') reason = ev.result;
       if (reason && causeId == null) causeId = y.node.id;
@@ -1754,7 +1757,7 @@ async function run() {
   highlight(null);
   setRunning(false);
   if (world.status === 'won') onWin();
-  else onFail(reason || 'incomplete', causeId ?? lastId);
+  else onFail(reason || (golemBumpId != null ? 'golem' : 'incomplete'), causeId ?? golemBumpId ?? lastId);
 }
 
 // Sub-tema "sebab akibat": sebutkan blok penyebab dan akibatnya, lalu tandai bloknya.

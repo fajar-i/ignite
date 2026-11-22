@@ -6,9 +6,14 @@
 //  solution: solusi acuan (diuji otomatis oleh tools/validate.mjs).
 // ============================================================
 
-// Langkah aman satu petak: dipakai di Stage 3 & 5.
+// Langkah aman satu petak: dipakai di Stage 3.
 const STEP_SAFE = ['jika', 'monster',
   [['jika', 'sleep', ['maju'], ['tunggu']]],
+  [['jika', 'trap', ['lompat'], ['maju']]],
+];
+// Langkah aman untuk golem (Bab 5): golem yang tertidur harus dilompati, bukan Maju.
+const STEP_SAFE_GOLEM = ['jika', 'monster',
+  [['jika', 'sleep', ['lompat'], ['tunggu']]],
   [['jika', 'trap', ['lompat'], ['maju']]],
 ];
 
@@ -135,13 +140,13 @@ export const LEVELS = [
       '~~~~~~~~~',
     ],
     startDir: 1,
-    // Program bawaan berisi 3 bug: kondisi terbalik, salah belok, loop berlebih.
+    // Program bawaan berisi 3 bug: pakai Maju (bukan Lompat) saat golem tidur, salah belok, loop berlebih.
     initialProgram: [
-      ['ulangi', 8, [['jika', 'monster',
-        [['jika', 'sleep', ['tunggu'], ['maju']]],
+      ['ulangi', 6, [['jika', 'monster',
+        [['jika', 'sleep', ['maju'], ['tunggu']]],
         [['jika', 'trap', ['lompat'], ['maju']]]]]],
       'kiri', 'tuas', ['ulangi', 4, ['maju']], 'kanan', 'maju',
     ],
-    solution: [['ulangi', 8, [STEP_SAFE]], 'kanan', 'tuas', ['ulangi', 3, ['maju']], 'kanan', 'maju'],
+    solution: [['ulangi', 6, [STEP_SAFE_GOLEM]], 'kanan', 'tuas', ['ulangi', 3, ['maju']], 'kanan', 'maju'],
   },
 ];
