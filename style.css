@@ -528,8 +528,16 @@ body.rm *, body.rm *::before, body.rm *::after { animation: none !important; tra
   background: #fff1c4; border: 1px solid var(--gold); border-left: 0.3rem solid var(--wax);
   border-radius: 0.45rem; padding: 0.45rem 0.6rem; margin-bottom: 0.5rem;
   font-size: 0.85rem; line-height: 1.45;
+  position: relative; padding-right: 2.2rem;
 }
 .plan-note b { color: var(--wax); }
+.note-close {
+  position: absolute; top: 0.25rem; right: 0.25rem; width: 1.75rem; height: 1.75rem;
+  display: grid; place-items: center; padding: 0; border-radius: 50%;
+  border: 1px solid transparent; background: transparent; color: var(--ink-soft);
+  font-size: 1.2rem; line-height: 1; cursor: pointer;
+}
+.note-close:hover, .note-close:focus-visible { color: var(--wax); background: #a87a1e22; border-color: var(--gold); }
 .plan-note span { display: block; font-style: italic; color: var(--ink-soft); font-size: 0.78rem; margin-top: 0.15rem; }
 
 /* layar desktop sempit: HUD bisa turun baris dan bertabrakan dengan teks konsep */

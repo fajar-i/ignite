@@ -29,8 +29,14 @@ initSaves(); // pilih slot aktif & migrasi data lama, sebelum ada yang membaca s
 //  walkClip : nama/urutan klip animasi jalan (Mixamo: 0). Diputar hanya
 //             saat kesatria bergerak; root motion dibuang otomatis.
 //  idleUrl  : file animasi diam (Mixamo, boleh "Without Skin"). null = tanpa idle.
+//  walkUrl  : file animasi jalan terpisah (opsional). null = pakai klip dari `url`.
+//  walkSteps: jumlah langkah (petak) dalam satu klip jalan. Siklus jalan Mixamo = 2,
+//             animasi satu langkah (mis. "Long Step Forward") = 1 -> diputar dari awal tiap petak.
 // ============================================================
-const KNIGHT_MODEL = { url: 'Walking.fbx', idleUrl: 'Idle.fbx', height: 0.95, rotationY: 0, yOffset: 0, walkClip: 0 };
+const KNIGHT_MODEL = {
+  url: 'Walking.fbx', idleUrl: 'Idle.fbx', walkUrl: 'LongStepForward.fbx', walkSteps: 1,
+  height: 0.95, rotationY: 0, yOffset: 0, walkClip: 0,
+};
 const PRINCESS_MODEL = { url: null, height: 0.35, rotationY: 0, offset: [0, 0.62, -0.24] };
 const MONSTER_MODEL = { url: null, height: 0.9, rotationY: 0, yOffset: 0 };
 const GOLEM_MODEL = { url: null, height: 1.1, rotationY: 0, yOffset: 0 };
@@ -473,9 +479,14 @@ async function applyCustomModels() {
       });
       setKnightObject(wrap);
       mixer = null; walkAction = null; idleAction = null; walkW = 0;
+      let walkAnims = animations;
+      if (KNIGHT_MODEL.walkUrl) {
+        try { walkAnims = (await loadRaw(KNIGHT_MODEL.walkUrl)).animations; }
+        catch (e) { console.error('Gagal memuat animasi jalan, pakai klip bawaan model:', e); }
+      }
       const clip = typeof KNIGHT_MODEL.walkClip === 'string'
-        ? animations.find((a) => a.name === KNIGHT_MODEL.walkClip)
-        : animations[KNIGHT_MODEL.walkClip ?? 0];
+        ? walkAnims.find((a) => a.name === KNIGHT_MODEL.walkClip)
+        : walkAnims[KNIGHT_MODEL.walkClip ?? 0];
       if (clip) {
         mixer = new THREE.AnimationMixer(model);
         walkAction = mixer.clipAction(stripRootMotion(clip));
@@ -641,8 +652,12 @@ async function travel(ev, token) {
   const jump = ev.type === 'jump';
   const arc = jump ? 0.7 : 0;
   const ms = dur(jump ? 560 : 420);
-  // satu petak = setengah siklus jalan (satu langkah kaki)
-  if (walkAction) walkRate = (walkAction.getClip().duration * 0.5) / (ms / 1000);
+  // satu petak = satu langkah kaki = 1/walkSteps klip
+  if (walkAction) {
+    const steps = KNIGHT_MODEL.walkSteps || 2;
+    if (steps === 1) walkAction.time = 0; // animasi satu langkah: mulai dari awal tiap petak
+    walkRate = (walkAction.getClip().duration / steps) / (ms / 1000);
+  }
   await tween(ms, (t) => {
     const e = ease(t);
     knight.position.set(lerp(from.x, to.x, e), lerp(from.y, to.y, e) + Math.sin(Math.PI * t) * arc, lerp(from.z, to.z, e));
@@ -730,62 +745,81 @@ async function animateEvent(ev, token) {
 }
 
 // ------------------------------------------------------------
-//  Suara: SFX + musik prosedural per stage
+//  Suara: semua dari file audio (kredit di readme). Tidak ada lagi nada sintesis.
+//  Jenis suara tanpa file -> sunyi (lihat SOUND_TODO).
 // ------------------------------------------------------------
 let muted = false;
 let actx = null;
 const audio = () => (actx ??= new (window.AudioContext || window.webkitAudioContext)());
-const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
 
-function tone(freq, len, type = 'square', vol = 0.05, when = 0) {
-  const ctx = audio();
-  const t = ctx.currentTime + when;
-  const o = ctx.createOscillator(), g = ctx.createGain();
-  o.type = type;
-  o.frequency.value = freq;
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + len);
-  o.connect(g).connect(ctx.destination);
-  o.start(t); o.stop(t + len + 0.02);
+// file: nama file di assets/sfx, gain: volume dasar, rate: kecepatan putar (mengubah nada)
+const SAMPLES = {
+  click: { file: 'click.mp3', gain: 0.7 },             // tombol, tambah/geser blok
+  turn:  { file: 'click.mp3', gain: 0.35, rate: 1.25 }, // kesatria berbelok
+  eval:  { file: 'click.mp3', gain: 0.3, rate: 1.6 },   // putri menjawab sensor
+  chime: { file: 'click.mp3', gain: 0.8, rate: 0.8 },   // tombol Simpan sekarang
+  win:   { file: 'win.mp3', gain: 0.7 },                // bab/level selesai
+  newcard: { file: 'win.mp3', gain: 0.7 },              // kartu "Blok Baru!" muncul
+};
+// Belum ada file (sunyi): step, jump, wait, lever, bump, fall, trap, caught, fail.
+const buffers = {};
+let samplesLoading = false;
+function loadSamples() {
+  if (samplesLoading) return;
+  samplesLoading = true;
+  for (const file of new Set(Object.values(SAMPLES).map((x) => x.file))) {
+    const url = 'assets/sfx/' + file;
+    fetch(url)
+      .then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+      .then((b) => audio().decodeAudioData(b))
+      .then((buf) => { buffers[file] = buf; })
+      .catch((e) => console.warn('Gagal memuat suara', url, e));
+  }
 }
+// Muat pada interaksi pertama (AudioContext butuh gestur pengguna).
+for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, loadSamples, { once: true, capture: true });
 
 function sfx(kind) {
-  if (muted) return;
+  if (muted || settings.sfx <= 0) return;
+  const def = SAMPLES[kind];
+  if (!def) return;
   try {
-    const P = {
-      step: [[330, 0.06]], turn: [[440, 0.05]], jump: [[300, 0.06], [560, 0.09]],
-      wait: [[260, 0.05], [260, 0.05]], lever: [[180, 0.05, 'sawtooth'], [520, 0.08], [700, 0.1]],
-      bump: [[120, 0.12, 'sawtooth']], fall: [[500, 0.1, 'triangle'], [350, 0.12, 'triangle'], [200, 0.2, 'triangle']],
-      trap: [[90, 0.18, 'sawtooth'], [70, 0.2, 'sawtooth']], caught: [[150, 0.12, 'sawtooth'], [110, 0.25, 'sawtooth']],
-      win: [[523, 0.1], [659, 0.1], [784, 0.1], [1046, 0.25]], fail: [[300, 0.12], [200, 0.2]],
-      click: [[600, 0.03]], eval: [[880, 0.04, 'sine']],
-    };
-    let w = 0;
-    const vol = 0.045 * (settings.sfx / 100);
-    if (vol <= 0) return;
-    for (const [f, d, type] of P[kind] || []) { tone(f, d, type || 'square', vol, w); w += d * 0.9; }
+    loadSamples();
+    const buf = buffers[def.file];
+    if (!buf) return;
+    const ctx = audio();
+    const src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = buf;
+    src.playbackRate.value = def.rate || 1;
+    g.gain.value = def.gain * (settings.sfx / 100);
+    src.connect(g).connect(ctx.destination);
+    src.start();
   } catch { /* audio tidak tersedia */ }
 }
 
-let musicTimer = null;
-function startMusic() {
-  stopMusic();
-  if (muted || !actx) return;
-  const m = stage.theme.music;
-  const beat = 60 / m.tempo / 2;
-  let i = 0;
-  musicTimer = setInterval(() => {
-    try {
-      const n = m.notes[i % m.notes.length];
-      const mv = settings.music / 100;
-      if (mv > 0 && i % 16 === 0) tone(midi(m.root - 12), beat * 15, 'sine', 0.02 * mv);
-      if (mv > 0 && n != null) tone(midi(m.root + n), beat * 1.8, 'triangle', 0.018 * mv);
-      i++;
-    } catch { stopMusic(); }
-  }, beat * 1000);
+// Musik: menu.mp3 di layar utama, game.mp3 di dalam bab (kredit di readme).
+// vol = volume dasar; game.mp3 ~7 dB lebih keras dari menu.mp3, jadi dasarnya lebih kecil.
+const makeTrack = (file, vol) => {
+  const a = new Audio('assets/sfx/' + file);
+  a.loop = true; a.preload = 'auto';
+  return { a, vol };
+};
+const menuTrack = makeTrack('menu.mp3', 0.5);
+const gameTrack = makeTrack('game.mp3', 0.15);
+let musicOn = true; // dimatikan sementara oleh stopMusic (mis. saat epilog)
+function updateMusic() {
+  const onTitle = !titleEl.hidden;
+  const allowed = !muted && settings.music > 0;
+  for (const [t, want] of [[menuTrack, allowed && onTitle], [gameTrack, allowed && !onTitle && musicOn]]) {
+    t.a.volume = Math.min(1, t.vol * (settings.music / 100));
+    if (want && t.a.paused) t.a.play().catch(() => { /* menunggu gestur pertama */ });
+    else if (!want && !t.a.paused) t.a.pause();
+  }
 }
-function stopMusic() { clearInterval(musicTimer); musicTimer = null; }
+function startMusic() { musicOn = true; updateMusic(); }
+function stopMusic() { musicOn = false; updateMusic(); }
+// Browser memblokir autoplay sampai ada interaksi; coba lagi pada klik/tombol pertama.
+for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, () => updateMusic(), { once: true, capture: true });
 
 const muteIcon = document.getElementById('muteIcon');
 function renderMute() {
@@ -797,7 +831,8 @@ document.getElementById('btnMute').onclick = () => {
   muted = !muted;
   store('muted', muted);
   renderMute();
-  if (muted) stopMusic(); else { audio(); startMusic(); }
+  if (!muted) audio();
+  updateMusic();
 };
 
 // ------------------------------------------------------------
@@ -975,11 +1010,19 @@ function renderProgram(focusId) {
   programEl.innerHTML = '';
   const main = document.createElement('div');
   main.className = 'main-wrap';
-  if (stage.initialProgram && programOwner === stage.id) {
+  if (stage.initialProgram && programOwner === stage.id && !load('hiddenNotes', []).includes(stage.id)) {
     main.insertAdjacentHTML('beforeend', `<div class="plan-note">
+      <button class="note-close" type="button" title="Tutup catatan" aria-label="Tutup catatan">×</button>
       <b>Rencana dari putri</b> — berisi 3 bug, bukan kodemu dari bab lain.
       Jalankan, lihat di mana kesatria gagal, lalu perbaiki.
       <span>Tombol "Muat ulang program" mengembalikan rencana ini.</span></div>`);
+    // Ditutup sekali = tidak muncul lagi untuk bab ini (per slot simpan).
+    main.querySelector('.note-close').onclick = () => {
+      store('hiddenNotes', [...new Set([...load('hiddenNotes', []), stage.id])]);
+      sfx('click');
+      renderProgram();
+      programEl.querySelector('.pitem')?.focus();
+    };
   }
   if (hasFn()) main.insertAdjacentHTML('beforeend', '<div class="list-label">Program utama</div>');
   main.appendChild(renderList(program, 'main'));
@@ -1232,13 +1275,21 @@ const maxId = (list) => list.reduce((m, n) => Math.max(m, n.id, ...childLists(n)
 // Program selalu disimpan ke stage pemiliknya (yang memuatnya), bukan `stage` yang sedang
 // tampil: pratinjau editor mengganti `stage` tanpa mengganti program.
 let programOwner = null;
+// Kode bab cerita hanya disimpan setelah bab itu meraih 3 bintang. Sebelum itu pemain
+// harus menyusun ulang dari awal setiap kali membuka bab, untuk mengejar 3 bintang.
+// Level custom selalu disimpan (tidak ada bintang untuk dikejar).
+function keepsCode(id) {
+  if (!LEVELS.some((l) => l.id === id)) return true;
+  return (progress().stars[id] || 0) >= 3;
+}
 function saveProgram() {
   if (programOwner == null) return;
+  if (!keepsCode(programOwner)) { removeSaved('prog.' + programOwner); return; }
   store('prog.' + programOwner, { program, fnBody, fnName });
 }
 function loadProgram() {
   programOwner = stage.id;
-  const saved = load('prog.' + stage.id, null);
+  const saved = keepsCode(stage.id) ? load('prog.' + stage.id, null) : null;
   if (saved) {
     program = saved.program || [];
     fnBody = saved.fnBody || [];
@@ -1400,12 +1451,14 @@ function onWin() {
     p.stars[stage.id] = Math.max(p.stars[stage.id] || 0, s);
     p.unlocked = Math.max(p.unlocked, Math.min(LEVELS.length, stage.id + 1));
     store('progress', p);
+    saveProgram(); // 3 bintang -> kode pemenang mulai disimpan
   }
   document.getElementById('winStars').innerHTML =
     `${'★'.repeat(s)}<span class="off">${'★'.repeat(3 - s)}</span>`;
   document.getElementById('winTitle').textContent = stage.custom ? 'Level selesai!' : `${chapterOf(stage)} selesai!`;
   document.getElementById('winText').textContent =
-    `Bagus sekali, ${playerName()}! Waktu menyusun ${fmt(elapsed)} · ${totalBlocks()} blok. "${WIN_LINES[stage.id] ?? 'Level buatanmu berhasil diselesaikan!'}"`;
+    `Bagus sekali, ${playerName()}! Waktu menyusun ${fmt(elapsed)} · ${totalBlocks()} blok. "${WIN_LINES[stage.id] ?? 'Level buatanmu berhasil diselesaikan!'}"` +
+    (!stage.custom && !keepsCode(stage.id) ? ' Kodemu belum disimpan: susun ulang dari awal untuk meraih 3 bintang!' : '');
   document.getElementById('winEng').innerHTML =
     `<b>Konsep:</b> ${stage.concept}<br><b>Engineering:</b> ${stage.engineering}`;
   document.getElementById('btnNext').textContent = stage.custom ? 'Edit level ›' : stage.id === LEVELS.length ? 'Epilog ›' : 'Bab berikutnya ›';
@@ -1679,7 +1732,7 @@ function showBlockCards(types, { isNew }) {
     $('bkPrev').onclick = () => { if (i > 0) { i--; draw(); sfx('click'); $('bkNext').focus(); } };
     $('bkNext').onclick = () => { sfx('click'); if (i < list.length - 1) { i++; draw(); } else blockCardsDone(); };
     draw();
-    if (isNew) sfx('win');
+    if (isNew) sfx('newcard');
     blockOverlay.hidden = false;
   });
 }
@@ -1714,6 +1767,7 @@ function syncTitleBg(instant = false) {
   const onTitle = !titleEl.hidden;
   document.body.classList.toggle('on-title', onTitle);
   bgfx.setPreset(onTitle ? 'menu' : 'game', { instant });
+  updateMusic(); // volume menu vs. di dalam bab
 }
 new MutationObserver(() => syncTitleBg()).observe(titleEl, { attributes: true, attributeFilter: ['hidden'] });
 syncTitleBg(true);
@@ -2107,7 +2161,7 @@ document.getElementById('btnSaveNow').onclick = () => {
   store('player', player);
   store('stats', stats);
   touch();
-  sfx('win');
+  sfx('chime');
   showToast(`Progres tersimpan di Slot ${activeSlot()} · ${fmtSaved(Date.now())}`);
 };
 document.getElementById('btnCloseSlots').onclick = () => { slotOverlay.hidden = true; };
@@ -2174,7 +2228,7 @@ const saveSettings = () => { store('settings', settings); applySettings(); };
 document.querySelectorAll('#setText button').forEach((b) => {
   b.onclick = () => { settings.text = b.dataset.v; saveSettings(); openSettings(); };
 });
-document.getElementById('setMusic').oninput = (e) => { settings.music = +e.target.value; saveSettings(); };
+document.getElementById('setMusic').oninput = (e) => { settings.music = +e.target.value; saveSettings(); updateMusic(); };
 document.getElementById('setSfx').oninput = (e) => { settings.sfx = +e.target.value; saveSettings(); };
 document.getElementById('setSfx').onchange = () => sfx('click');
 document.getElementById('setContrast').onchange = (e) => { settings.contrast = e.target.checked; saveSettings(); };
@@ -2253,4 +2307,5 @@ applySettings();
 renderTitle();
 muted = load('muted', false);
 renderMute();
+updateMusic();
 loadStage(Math.min(load('last', 0), progress().unlocked - 1), { intro: false });
