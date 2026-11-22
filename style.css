@@ -11,8 +11,8 @@
   --sa-b: env(safe-area-inset-bottom, 0px);
   --sa-l: env(safe-area-inset-left, 0px);
 
-  --paper: #f3e6c8;
-  --paper-2: #e6d3a8;
+  --paper: #f3d998;
+  --paper-2: #e6c987;
   --paper-3: #fbf3df;
   --paper-edge: #c9ae7c;
   --ink: #3b2a1a;
@@ -36,7 +36,8 @@
   --c-act: #3f6a3a;
   --c-fn: #9c2f2f;
 
-  --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42 0 0 0 0 .3 0 0 0 0 .16 0 0 0 .11 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* Tekstur kain: Smithsonian on Unsplash (lihat readme) */
+  --noise: url("assets/paper.jpg");
   --title-font: "Cinzel", "Times New Roman", serif;
   --body-font: "Lora", Georgia, serif;
 }
@@ -671,4 +672,57 @@ textarea.ask-field { font-family: ui-monospace, Consolas, monospace; font-size: 
   .dialog-card { padding: 1.1rem 1.1rem 1rem; }
   .dlg-kicker { max-width: calc(100% - 4.8rem); font-size: 0.72rem; }
   .dlg-nav #dlgPopNext { min-width: 6.8rem; }
+}
+
+/* ---------- slot simpan / profil ---------- */
+.slot-sub { margin: 0 0 0.9rem; font-style: italic; }
+.slot-list { display: grid; gap: 0.6rem; text-align: left; }
+.slot {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 0.9rem; align-items: center;
+  background: var(--paper-3); border: 1px solid #3b2a1a40; border-radius: 0.6rem; padding: 0.7rem 0.9rem;
+  box-shadow: 0 2px 0 #3b2a1a26;
+}
+.slot.active { border: 2px solid var(--gold); }
+.slot.empty { border-style: dashed; background: transparent; box-shadow: none; }
+.slot .avatar { width: 3.2rem; height: 3.2rem; font-size: 1.4rem; }
+.slot.empty .avatar { background: #3b2a1a1a; box-shadow: none; color: var(--ink-soft); text-shadow: none; }
+.slot-no { font-family: var(--title-font); font-weight: 700; font-size: 0.75rem; letter-spacing: 0.1em; color: var(--ink-soft); }
+.slot-name { font-family: var(--title-font); font-weight: 700; font-size: 1.15rem; color: var(--wax); line-height: 1.2; }
+.slot-meta { font-size: 0.85rem; color: var(--ink-soft); }
+.slot-meta .st { color: var(--gold-deep); }
+.slot-time { font-size: 0.78rem; font-style: italic; color: var(--ink-soft); }
+.slot-badge { font-family: var(--title-font); font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; background: var(--gold-deep); color: #fff; border-radius: 0.3rem; padding: 0.05rem 0.35rem; margin-left: 0.4rem; vertical-align: middle; }
+.slot-actions { display: flex; gap: 0.35rem; flex-wrap: wrap; justify-content: flex-end; }
+.slot-actions .btn, .slot-actions .run.small { padding: 0.4rem 0.7rem; height: auto; font-size: 0.85rem; }
+.slot-tools { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin: 1rem 0 0.8rem; padding-top: 0.8rem; border-top: 1px solid var(--ink-faint); }
+@media (max-width: 560px) {
+  .slot { grid-template-columns: auto 1fr; }
+  .slot-actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
+/* ---------- pratinjau posisi jatuh (blok bayangan) ---------- */
+.drop-ghost {
+  display: flex; align-items: center; gap: 0.5rem; pointer-events: none;
+  border: 2px dashed var(--cat); border-radius: 0.45rem; padding: 0.3rem 0.5rem;
+  background: color-mix(in srgb, var(--cat) 12%, var(--paper-3));
+  font-size: 0.95rem; color: var(--ink); opacity: 0.92;
+  animation: ghost-in 0.12s ease-out;
+}
+.drop-ghost svg { color: var(--cat); }
+.drop-ghost .num { color: var(--cat); font-weight: 700; font-style: normal; font-size: 0.75rem; min-width: 1rem; text-align: right; }
+.drop-ghost .lbl { flex: 1; font-weight: 600; }
+.ghost-tag {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em; white-space: nowrap;
+  background: var(--cat); color: #fff; border-radius: 999px; padding: 0.05rem 0.45rem;
+}
+@keyframes ghost-in { from { opacity: 0; transform: scaleY(0.6); } }
+.plist:has(> .drop-ghost) > .empty { display: none; }
+.pitem.dragging { opacity: 0.3; border-style: dashed; }
+
+/* seret ke luar program = hapus */
+.program.will-delete { outline: 2px dashed var(--bad); outline-offset: -2px; background: #a83a2a14; }
+.program.will-delete::before {
+  content: "🗑 Lepas di luar program untuk menghapus blok"; position: sticky; top: 0; z-index: 1;
+  display: block; text-align: center; font-size: 0.82rem; font-weight: 700; color: #fff;
+  background: var(--bad); border-radius: 0.35rem; padding: 0.25rem 0.5rem;
 }

@@ -6,12 +6,18 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { LEVELS } from './levels.js';
 import { initUI } from './ui.js';
 import { BLOCK_INFO } from './blocks-info.js';
+import {
+  initSaves, store, load, remove as removeSaved, activeSlot, setActiveSlot, touch, SLOT_COUNT,
+  slotInfo, clearSlot, exportSlot, parseSaveFile, importInto,
+} from './saves.js';
 import { createEditor, newDraft, draftToLevel, encodeDraft, decodeDraft } from './editor.js';
 import { World, DIRS, CONDITIONS } from './world.js';
 import { interpret, LimitError, fromCompact, newId, bumpId, childLists, countBlocks } from './interpreter.js';
 import {
   GAME_TITLE, SPEAKERS, PROLOG, EPILOG, STAGE_INTRO, HINTS, FAIL_LINES, WIN_LINES,
 } from './story.js';
+
+initSaves(); // pilih slot aktif & migrasi data lama, sebelum ada yang membaca simpanan
 
 // ============================================================
 //  MODEL 3D (.glb / .gltf / .fbx, mis. dari Mixamo)
@@ -793,8 +799,7 @@ document.getElementById('btnMute').onclick = () => {
 // ------------------------------------------------------------
 //  Penyimpanan
 // ------------------------------------------------------------
-function store(k, v) { try { localStorage.setItem('kesatria.' + k, JSON.stringify(v)); } catch {} }
-function load(k, d) { try { const v = localStorage.getItem('kesatria.' + k); return v === null ? d : JSON.parse(v); } catch { return d; } }
+// Kunci disimpan per slot profil (lihat saves.js); pengaturan & suara berlaku global.
 const progress = () => ({ unlocked: 1, stars: {}, ...load('progress', {}) });
 
 // ------------------------------------------------------------
@@ -1031,7 +1036,7 @@ function renderList(list, listId) {
     e.stopPropagation();
     if (drag.kind === 'move') {
       const f = findNode(drag.id);
-      if (f && containsList(f.node, listId)) return; // tidak boleh masuk ke dirinya sendiri
+      if (f && containsList(f.node, listId)) { dropGhost?.remove(); ghostKey = ''; return; } // tidak boleh masuk ke dirinya sendiri
     }
     e.preventDefault();
     e.dataTransfer.dropEffect = drag.kind === 'new' ? 'copy' : 'move';
@@ -1142,13 +1147,17 @@ function renderNode(n, i) {
     drag = { kind: 'move', id: n.id };
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', String(n.id));
-    requestAnimationFrame(() => el.classList.add('dragging'));
+    // dipasang satu frame kemudian (agar gambar seret tidak ikut pudar), tapi hanya bila seret masih berlangsung
+    requestAnimationFrame(() => { if (drag?.kind === 'move' && drag.id === n.id) el.classList.add('dragging'); });
   });
   el.addEventListener('dragend', endDrag);
   return el;
 }
 
-let dropLine = null;
+// ---------- pratinjau posisi jatuh: blok bayangan ----------
+// Blok bayangan (.drop-ghost) bukan .pitem, jadi tidak ikut dihitung dropIndex.
+let dropGhost = null;
+let ghostKey = '';
 function dropIndex(listEl, y) {
   const items = [...listEl.children].filter((c) => c.classList.contains('pitem'));
   for (let i = 0; i < items.length; i++) {
@@ -1157,18 +1166,58 @@ function dropIndex(listEl, y) {
   }
   return items.length;
 }
+function ghostContent(listEl, idx) {
+  const moving = drag.kind === 'move' ? findNode(drag.id) : null;
+  const n = moving?.node;
+  const type = n ? n.type : drag.type;
+  const label = type === 'repeat' ? `Ulangi ${n?.count ?? 2} kali`
+    : type === 'if' ? `Jika ${CONDITIONS[n?.cond ?? 'monster']}`
+    : type === 'call' ? `Panggil ${fnName}`
+    : BLOCKS[type].label;
+  const inner = n ? childLists(n).reduce((s, l) => s + countBlocks(l), 0) : 0;
+  // nomor akhir: kalau dipindah ke bawah di daftar yang sama, posisinya bergeser satu
+  const sameList = moving && moving.list === getList(listEl.dataset.list);
+  const pos = sameList && moving.index < idx ? idx : idx + 1;
+  return {
+    type,
+    html: `<span class="num">${pos}</span>${svg(type)}<span class="lbl">${esc(label)}</span>`
+      + (inner ? `<span class="ghost-tag">+${inner} di dalam</span>` : '')
+      + `<span class="ghost-tag">${moving ? 'pindah ke sini' : 'baru'}</span>`,
+  };
+}
 function showDropLine(listEl, idx) {
-  dropLine ??= Object.assign(document.createElement('div'), { className: 'drop-line' });
+  programEl.classList.remove('will-delete');
   const items = [...listEl.children].filter((c) => c.classList.contains('pitem'));
-  listEl.insertBefore(dropLine, items[idx] || null);
+  const key = `${listEl.dataset.list}:${idx}`;
+  if (!dropGhost) {
+    dropGhost = document.createElement('div');
+    dropGhost.className = 'drop-ghost';
+    dropGhost.setAttribute('aria-hidden', 'true');
+  }
+  if (key !== ghostKey || !dropGhost.isConnected) {
+    const { type, html } = ghostContent(listEl, idx);
+    dropGhost.style.setProperty('--cat', catVar(type));
+    dropGhost.innerHTML = html;
+    ghostKey = key;
+  }
+  const before = items[idx] || null;
+  if (dropGhost.parentNode !== listEl || dropGhost.nextSibling !== before) listEl.insertBefore(dropGhost, before);
 }
 function endDrag() {
   drag = null;
-  dropLine?.remove();
+  ghostKey = '';
+  dropGhost?.remove();
+  programEl.classList.remove('will-delete');
   document.querySelectorAll('.pitem.dragging').forEach((e) => e.classList.remove('dragging'));
 }
-// seret blok keluar area program = hapus
-document.addEventListener('dragover', (e) => { if (drag?.kind === 'move') { e.preventDefault(); dropLine?.remove(); } });
+// seret blok keluar area program = hapus (pratinjau: bayangan hilang, program diberi tanda hapus)
+document.addEventListener('dragover', (e) => {
+  if (drag?.kind !== 'move') return;
+  e.preventDefault();
+  dropGhost?.remove();
+  ghostKey = '';
+  programEl.classList.add('will-delete');
+});
 document.addEventListener('drop', (e) => {
   if (drag?.kind === 'move' && !programEl.contains(e.target)) { e.preventDefault(); deleteNode(drag.id); }
   endDrag();
@@ -1241,7 +1290,7 @@ setInterval(() => {
   const now = performance.now();
   const dt = (now - lastTick) / 1000;
   lastTick = now;
-  const menuOpen = !document.getElementById('blockOverlay').hidden || !document.getElementById('dialogOverlay').hidden || !document.getElementById('askOverlay').hidden || !document.getElementById('profileOverlay').hidden || !document.getElementById('settingsOverlay').hidden || !document.getElementById('stageOverlay').hidden;
+  const menuOpen = !document.getElementById('slotOverlay').hidden || !document.getElementById('blockOverlay').hidden || !document.getElementById('dialogOverlay').hidden || !document.getElementById('askOverlay').hidden || !document.getElementById('profileOverlay').hidden || !document.getElementById('settingsOverlay').hidden || !document.getElementById('stageOverlay').hidden;
   const active = !running && !editing && !stageDone && !menuOpen && blockingUI === 0 && document.getElementById('titleOverlay').hidden && document.visibilityState === 'visible';
   if (!active) return;
   elapsed += dt;
@@ -1650,7 +1699,7 @@ function saveCustom(d) {
 }
 function deleteCustom(id) {
   store('custom', customs().filter((c) => c.id !== id));
-  try { localStorage.removeItem('kesatria.prog.' + id); } catch {}
+  removeSaved('prog.' + id);
 }
 
 const titleEl = document.getElementById('titleOverlay');
@@ -1863,9 +1912,11 @@ function renderTitle() {
   const w = document.getElementById('welcomeText');
   w.hidden = !has;
   if (has) {
-    w.innerHTML = `Selamat datang kembali, <b>${esc(player.name)}</b>. <button id="btnNotMe">bukan kamu?</button>`;
-    w.querySelector('#btnNotMe').onclick = () => { player.name = ''; nameInput.value = ''; renderTitle(); nameInput.focus(); };
+    const info = slotInfo(activeSlot());
+    w.innerHTML = `Selamat datang kembali, <b>${esc(player.name)}</b>.<br>
+      <span class="slot-meta">Slot ${activeSlot()} · ${chapterOf({ id: Math.min(info.unlocked, LEVELS.length) })} · <span class="st">★</span> ${info.stars}/${LEVELS.length * 3}</span>`;
   }
+  document.getElementById('btnPlay').textContent = has ? 'LANJUTKAN' : 'MULAI PETUALANGAN';
 }
 function setName(n) {
   player.name = n.trim().slice(0, 20);
@@ -1934,6 +1985,159 @@ document.getElementById('btnProfile').onclick = openProfile;
 document.getElementById('btnTitleProfile').onclick = openProfile;
 document.getElementById('btnCloseProfile').onclick = () => { profileOverlay.hidden = true; };
 profileOverlay.onclick = (e) => { if (e.target === profileOverlay) profileOverlay.hidden = true; };
+// ---------- slot simpan: muat, profil baru, hapus, simpan, ekspor/impor ----------
+const slotOverlay = document.getElementById('slotOverlay');
+const fmtSaved = (t) => (t ? new Date(t).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
+
+// Muat ulang objek profil di memori dari slot aktif.
+function reloadProfileState() {
+  for (const k of Object.keys(player)) delete player[k];
+  Object.assign(player, { name: '' }, load('player', {}));
+  for (const k of Object.keys(stats)) delete stats[k];
+  Object.assign(stats, { runs: 0, wins: 0, fails: 0 }, load('stats', {}));
+}
+function switchToSlot(s) {
+  setActiveSlot(s);
+  reloadProfileState();
+  goToMenu(); // kembali ke sampul dengan profil yang baru dimuat
+  loadStage(Math.min(load('last', 0), progress().unlocked - 1), { intro: false });
+}
+
+// mode: 'load' (muat/ganti) atau 'new' (pilih slot untuk profil baru)
+function openSlots(mode = 'load') {
+  const list = document.getElementById('slotList');
+  document.getElementById('slotTitle').textContent = mode === 'new' ? 'Profil Baru' : 'Muat Profil';
+  document.getElementById('slotSub').textContent = mode === 'new'
+    ? 'Pilih slot untuk petualangan baru. Slot terisi akan ditimpa.'
+    : 'Pilih profil untuk dilanjutkan. Progres tersimpan otomatis di setiap slot.';
+  list.innerHTML = '';
+  for (let s = 1; s <= SLOT_COUNT; s++) {
+    const info = slotInfo(s);
+    const isActive = s === activeSlot() && !info.empty;
+    const card = document.createElement('div');
+    card.className = 'slot' + (info.empty ? ' empty' : '') + (isActive ? ' active' : '');
+    card.setAttribute('role', 'listitem');
+    if (info.empty) {
+      card.innerHTML = `<div class="avatar">${s}</div>
+        <div><div class="slot-no">SLOT ${s}</div><div class="slot-name">Slot kosong</div>
+        <div class="slot-time">Belum ada petualangan</div></div>
+        <div class="slot-actions"><button class="run small" data-a="new">Profil baru</button></div>`;
+    } else {
+      const r = rankFor(info.stars);
+      card.innerHTML = `<div class="avatar">${esc(info.name[0].toUpperCase())}</div>
+        <div><div class="slot-no">SLOT ${s}${isActive ? '<span class="slot-badge">AKTIF</span>' : ''}</div>
+        <div class="slot-name">${esc(info.name)}</div>
+        <div class="slot-meta">${r.title} · ${chapterOf({ id: Math.min(info.unlocked, LEVELS.length) })} · <span class="st">★</span> ${info.stars}/${LEVELS.length * 3}${info.customs ? ` · ${info.customs} level buatan` : ''}</div>
+        <div class="slot-time">Disimpan ${fmtSaved(info.savedAt)}</div></div>
+        <div class="slot-actions">
+          ${mode === 'new'
+            ? '<button class="btn danger" data-a="new">Timpa</button>'
+            : `<button class="run small" data-a="load">${isActive ? 'Lanjutkan' : 'Muat'}</button>`}
+          <button class="btn danger" data-a="del" aria-label="Hapus profil ${esc(info.name)}" title="Hapus profil">
+            <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>
+        </div>`;
+    }
+    card.querySelector('[data-a=load]')?.addEventListener('click', () => {
+      slotOverlay.hidden = true;
+      if (s !== activeSlot()) { switchToSlot(s); showToast(`Profil "${info.name}" dimuat`); }
+      else goToMenu();
+    });
+    card.querySelector('[data-a=new]')?.addEventListener('click', () => newProfileIn(s, info));
+    card.querySelector('[data-a=del]')?.addEventListener('click', async () => {
+      const yes = await ask({
+        title: 'Hapus profil?', danger: true, ok: 'Hapus permanen',
+        text: `Profil "${info.name}" di Slot ${s} beserta semua progres dan level buatannya akan dihapus dan tidak bisa dikembalikan. Ekspor dulu kalau ingin menyimpan salinan.`,
+      });
+      if (!yes) return;
+      clearSlot(s);
+      if (s === activeSlot()) { reloadProfileState(); renderTitle(); }
+      showToast(`Slot ${s} dikosongkan`);
+      openSlots(mode);
+    });
+    list.appendChild(card);
+  }
+  document.getElementById('btnExportSave').disabled = slotInfo(activeSlot()).empty;
+  slotOverlay.hidden = false;
+}
+
+async function newProfileIn(s, info) {
+  if (!info.empty) {
+    const yes = await ask({
+      title: `Timpa Slot ${s}?`, danger: true, ok: 'Timpa',
+      text: `Profil "${info.name}" dan semua progresnya akan diganti dengan petualangan baru.`,
+    });
+    if (!yes) return;
+  }
+  askValidate = (v) => (v.trim() ? null : 'Nama tidak boleh kosong');
+  const name = await ask({ title: 'Profil baru', text: `Siapa namamu, pembaca? (Slot ${s})`, input: 'line', placeholder: 'Tulis namamu', ok: 'Mulai petualangan' });
+  askValidate = null;
+  if (!name) return;
+  clearSlot(s);
+  setActiveSlot(s);
+  store('player', { name: name.trim().slice(0, 20) });
+  reloadProfileState();
+  slotOverlay.hidden = true;
+  goToMenu();
+  document.getElementById('btnPlay').click(); // langsung mulai: prolog lalu Bab I
+}
+
+document.getElementById('btnLoadProfile').onclick = () => openSlots('load');
+document.getElementById('btnNewProfile').onclick = () => {
+  const empty = Array.from({ length: SLOT_COUNT }, (_, i) => slotInfo(i + 1)).find((x) => x.empty);
+  // ada slot kosong -> langsung pakai; semua penuh -> pilih slot untuk ditimpa
+  if (empty) newProfileIn(empty.slot, empty); else openSlots('new');
+};
+document.getElementById('btnSwitchProfile').onclick = () => { profileOverlay.hidden = true; openSlots('load'); };
+document.getElementById('btnSaveNow').onclick = () => {
+  saveProgram();
+  store('player', player);
+  store('stats', stats);
+  touch();
+  sfx('win');
+  showToast(`Progres tersimpan di Slot ${activeSlot()} · ${fmtSaved(Date.now())}`);
+};
+document.getElementById('btnCloseSlots').onclick = () => { slotOverlay.hidden = true; };
+slotOverlay.onclick = (e) => { if (e.target === slotOverlay) slotOverlay.hidden = true; };
+
+// Ekspor: unduh file .json berisi seluruh isi slot aktif.
+document.getElementById('btnExportSave').onclick = () => {
+  saveProgram();
+  const data = exportSlot(activeSlot());
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  const safe = (player.name || 'profil').replace(/[^\w-]+/g, '_');
+  a.href = URL.createObjectURL(blob);
+  a.download = `mata-sang-kesatria-${safe}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  showToast('File simpanan diunduh');
+};
+// Impor: baca file .json, masukkan ke slot kosong (atau timpa slot aktif setelah konfirmasi).
+document.getElementById('btnImportSave').onclick = () => document.getElementById('importFile').click();
+document.getElementById('importFile').onchange = async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  let obj;
+  try { obj = parseSaveFile(await file.text()); } catch (err) { showToast(err.message); return; }
+  const name = JSON.parse(obj.data.player).name;
+  let target = Array.from({ length: SLOT_COUNT }, (_, i) => slotInfo(i + 1)).find((x) => x.empty)?.slot;
+  if (!target) {
+    const yes = await ask({
+      title: 'Semua slot terisi', danger: true, ok: `Timpa Slot ${activeSlot()}`,
+      text: `Simpanan "${name}" akan menimpa profil di Slot ${activeSlot()}. Lanjutkan?`,
+    });
+    if (!yes) return;
+    target = activeSlot();
+  }
+  importInto(target, obj);
+  slotOverlay.hidden = true;
+  switchToSlot(target);
+  showToast(`Profil "${name}" diimpor ke Slot ${target}`);
+};
+
 document.getElementById('btnRename').onclick = async () => {
   askValidate = (v) => (v.trim() ? null : 'Nama tidak boleh kosong');
   const n = await ask({ title: 'Ganti nama', text: 'Nama ini dipakai narator dan putri untuk menyapamu.', input: 'line', value: player.name, ok: 'Simpan' });
@@ -1970,6 +2174,7 @@ settingsOverlay.onclick = (e) => { if (e.target === settingsOverlay) settingsOve
 function goBack() {
   if (!askEl.hidden) { askResolve?.(null); return; }
   if (!blockOverlay.hidden) { blockCardsDone?.(); return; }
+  if (!slotOverlay.hidden) { slotOverlay.hidden = true; return; }
   if (!dialogOverlay.hidden) { closeDialog(); return; }
   if (!settingsOverlay.hidden) { settingsOverlay.hidden = true; return; }
   if (!profileOverlay.hidden) { profileOverlay.hidden = true; return; }
@@ -2004,7 +2209,7 @@ function goToMenu() {
     if (editor.draft) saveCustom(editor.draft);
     exitEditor();
   }
-  for (const o of [settingsOverlay, profileOverlay, stageOverlay, winOverlay]) o.hidden = true;
+  for (const o of [settingsOverlay, profileOverlay, stageOverlay, winOverlay, slotOverlay]) o.hidden = true;
   world.reset();
   resetVisual();
   stopMusic();

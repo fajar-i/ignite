@@ -126,6 +126,10 @@
       <div class="title-actions">
         <button class="run" id="btnPlay" data-autofocus>BUKA BUKU</button>
         <div class="title-row">
+          <button class="btn" id="btnLoadProfile">Muat profil</button>
+          <button class="btn" id="btnNewProfile">Profil baru</button>
+        </div>
+        <div class="title-row">
           <button class="btn" id="btnTitleStages">Daftar bab</button>
           <button class="btn" id="btnTitleEditor">Buat level</button>
         </div>
@@ -199,6 +203,8 @@
       <h3 class="sec-title">Bintang per bab</h3>
       <div class="chapter-stars" id="chapterStars"></div>
       <div class="modal-actions">
+        <button class="btn" id="btnSaveNow">Simpan sekarang</button>
+        <button class="btn" id="btnSwitchProfile">Ganti profil</button>
         <button class="btn" id="btnRename">Ganti nama</button>
         <button class="run small" id="btnCloseProfile" data-autofocus>Tutup</button>
       </div>
@@ -224,6 +230,25 @@
       <div class="modal-actions">
         <button class="run small" id="btnCloseSettings">Simpan</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Slot simpan / profil -->
+  <div class="overlay" id="slotOverlay" role="dialog" aria-modal="true" aria-labelledby="slotTitle" hidden>
+    <div class="modal wide paper slots">
+      <h2 id="slotTitle">Pilih Profil</h2>
+      <p class="slot-sub" id="slotSub"></p>
+      <div class="slot-list" id="slotList" role="list"></div>
+      <div class="slot-tools">
+        <button class="btn" id="btnExportSave" title="Unduh simpanan profil aktif sebagai file .json">
+          <svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg> Ekspor profil aktif
+        </button>
+        <button class="btn" id="btnImportSave" title="Muat simpanan dari file .json">
+          <svg viewBox="0 0 24 24"><path d="M12 21V9M7 14l5-5 5 5M5 3h14"/></svg> Impor dari file
+        </button>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
+      </div>
+      <button class="btn" id="btnCloseSlots">Tutup</button>
     </div>
   </div>
 
