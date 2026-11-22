@@ -351,6 +351,17 @@ input[type=range] { width: 100%; accent-color: var(--wax); }
 body.on-title .viewport { height: auto; bottom: 0; background: #0e0920; }
 body.on-title .viewport canvas:not(.bgfx) { visibility: hidden; }
 body.on-title .app { visibility: hidden; }
+/* Layar muat: sembunyikan semua UI sampai main.js siap */
+.boot { display: none; }
+body.booting .boot {
+  display: grid; place-content: center; justify-items: center; gap: 0.8rem;
+  position: fixed; inset: 0; z-index: 50; color: #f3e6c8; text-align: center;
+  font-family: var(--body-font); font-style: italic; font-size: 1.05rem;
+}
+body.booting .overlay { visibility: hidden; }
+.boot-mark { font-size: 2rem; color: var(--gold-light); animation: boot-spin 2.4s linear infinite; }
+body.boot-failed .boot-mark { animation: none; color: var(--bad); }
+@keyframes boot-spin { to { transform: rotate(360deg); } }
 .title-card { width: min(34rem, 100%); padding: 2.2rem 2.4rem 1.6rem; text-align: center; animation: rise 0.6s ease-out; }
 @keyframes rise { from { transform: translateY(1rem); opacity: 0; } }
 .ornament { font-size: 0.9rem; letter-spacing: 0.6rem; color: var(--gold); line-height: 1; padding-left: 0.6rem; }

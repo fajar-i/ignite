@@ -754,10 +754,10 @@ const audio = () => (actx ??= new (window.AudioContext || window.webkitAudioCont
 
 // file: nama file di assets/sfx, gain: volume dasar, rate: kecepatan putar (mengubah nada)
 const SAMPLES = {
-  click: { file: 'click.mp3', gain: 0.7 },             // tombol, tambah/geser blok
-  turn:  { file: 'click.mp3', gain: 0.35, rate: 1.25 }, // kesatria berbelok
-  eval:  { file: 'click.mp3', gain: 0.3, rate: 1.6 },   // putri menjawab sensor
-  chime: { file: 'click.mp3', gain: 0.8, rate: 0.8 },   // tombol Simpan sekarang
+  click: { file: 'click.mp3', gain: 0.25 },             // tombol, tambah/geser blok
+  turn:  { file: 'click.mp3', gain: 0.2, rate: 1.25 }, // kesatria berbelok
+  eval:  { file: 'click.mp3', gain: 0.2, rate: 1.6 },   // putri menjawab sensor
+  chime: { file: 'click.mp3', gain: 0.3, rate: 0.8 },   // tombol Simpan sekarang
   win:   { file: 'win.mp3', gain: 0.7 },                // bab/level selesai
   newcard: { file: 'win.mp3', gain: 0.7 },              // kartu "Blok Baru!" muncul
 };
@@ -2069,6 +2069,7 @@ function switchToSlot(s) {
   reloadProfileState();
   goToMenu(); // kembali ke sampul dengan profil yang baru dimuat
   loadStage(Math.min(load('last', 0), progress().unlocked - 1), { intro: false });
+document.body.classList.remove('booting'); // layar muat selesai
 }
 
 // mode: 'load' (muat/ganti) atau 'new' (pilih slot untuk profil baru)
@@ -2309,3 +2310,4 @@ muted = load('muted', false);
 renderMute();
 updateMusic();
 loadStage(Math.min(load('last', 0), progress().unlocked - 1), { intro: false });
+document.body.classList.remove('booting'); // layar muat selesai

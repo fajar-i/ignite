@@ -16,7 +16,12 @@
     }
   </script>
 </head>
-<body>
+<body class="on-title booting">
+  <!-- Layar muat: tampil sampai js/main.js selesai (three.js dari CDN bisa lambat) -->
+  <div class="boot" id="boot" role="status" aria-live="polite">
+    <div class="boot-mark" aria-hidden="true">✦</div>
+    <p id="bootText">Membuka buku…</p>
+  </div>
   <!-- Dunia 3D: penuh layar -->
   <div class="viewport" id="viewport"></div>
 
@@ -316,5 +321,14 @@
   </div>
 
   <script type="module" src="js/main.js"></script>
+  <script>
+    // Bila modul gagal dimuat (mis. tanpa internet), jangan biarkan layar muat berputar selamanya.
+    setTimeout(function () {
+      if (document.body.classList.contains('booting')) {
+        document.getElementById('bootText').textContent = 'Gagal memuat. Periksa koneksi internet, lalu muat ulang halaman.';
+        document.body.classList.add('boot-failed');
+      }
+    }, 20000);
+  </script>
 </body>
 </html>
