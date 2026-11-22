@@ -135,6 +135,7 @@
         </div>
         <div class="title-row">
           <button class="btn" id="btnProlog">Prolog</button>
+          <button class="btn" id="btnEpilog" hidden>Epilog</button>
           <button class="btn" id="btnTitleProfile">Profil</button>
           <button class="btn" id="btnTitleSettings">Pengaturan</button>
           <button class="btn" id="btnTitleCredits">Kredit</button>
@@ -146,8 +147,13 @@
 
   <!-- Cutscene: halaman buku -->
   <div class="overlay story" id="storyOverlay" hidden>
+    <div class="story-flash" id="storyFlash" aria-hidden="true"></div>
     <div class="story-card paper">
       <div class="story-label" id="storyLabel"></div>
+      <div class="story-art" id="storyArt" aria-hidden="true" hidden>
+        <div class="story-figure knight"><img src="assets/portraits/knight.png" alt="" /></div>
+        <div class="story-figure princess"><img src="assets/portraits/princess.png" alt="" /></div>
+      </div>
       <p class="story-text" id="storyText"></p>
       <div class="story-actions">
         <button class="link-btn" id="storySkip">Lewati</button>
@@ -171,6 +177,7 @@
       </div>
       <div class="stage-grid" id="customGrid"></div>
       <div class="modal-actions">
+        <button class="btn" id="btnStageEpilog" hidden>Tonton ulang epilog</button>
         <button class="btn" id="btnSaveNow">Simpan sekarang</button>
         <button class="run small" id="btnCloseStages">Tutup</button>
       </div>

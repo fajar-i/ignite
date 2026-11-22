@@ -40,6 +40,7 @@ export const EPILOG = [
   'Terima kasih telah menjadi mata sang kesatria, {pemain}. Kisah ini... belum selesai.',
   'Bersambung...',
 ];
+export const EPILOG_MOODS = ['dawn', 'dawn', 'hush', 'reveal', 'cursed', 'cursed', 'finale'];
 
 // Dialog pembuka tiap stage. Beberapa kalimat putri adalah petunjuk halus plot twist (Bab 3.3 no. 5).
 export const STAGE_INTRO = {
