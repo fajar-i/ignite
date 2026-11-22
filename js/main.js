@@ -423,7 +423,13 @@ function stripRootMotion(clip) {
   for (const t of clip.tracks) {
     if (!/(Hips|rootx)\.position$/i.test(t.name)) continue;
     const v = t.values;
-    for (let i = 0; i < v.length; i += 3) { v[i] = v[0]; v[i + 2] = v[2]; }
+    // Sumbu tegak = komponen dengan nilai awal terbesar (tinggi pinggul dari lantai).
+    // Mixamo (Hips): Y. Auto-Rig Pro dari Blender (rootx, armature Z-up): Z.
+    // Sumbu tegak dipertahankan (naik-turun pinggul, lonjakan lompat); dua sumbu datar dibekukan.
+    const up = [0, 1, 2].reduce((a, b) => (Math.abs(v[b]) > Math.abs(v[a]) ? b : a), 0);
+    for (let i = 0; i < v.length; i += 3) {
+      for (let k = 0; k < 3; k++) if (k !== up) v[i + k] = v[k];
+    }
   }
   clip.userData = { ...clip.userData, stripped: true };
   return clip;
@@ -512,7 +518,9 @@ async function applyCustomModels() {
       const jumpOwn = byName(KNIGHT_MODEL.jumpClip);
       if (jumpOwn && mixer) {
         jumpAction = mixer.clipAction(stripRootMotion(jumpOwn));
-        jumpAction.play();
+        // sekali putar per perintah Lompat, lalu tertahan di pose mendarat
+        jumpAction.setLoop(THREE.LoopOnce, 1);
+        jumpAction.clampWhenFinished = true;
         jumpAction.setEffectiveWeight(0);
       }
       if (KNIGHT_MODEL.idleUrl) {
@@ -621,7 +629,7 @@ renderer.setAnimationLoop(() => {
   if (mixer) {
     if (idleAction) {
       // campur halus idle <-> jalan
-      walkW += ((walkRate > 0 ? 1 : 0) - walkW) * Math.min(1, dt * 12);
+      walkW += ((walkRate > 0 ? 1 : 0) - walkW) * Math.min(1, dt * 9);
       idleAction.setEffectiveWeight(1 - walkW);
       for (const act of [walkAction, jumpAction]) {
         if (!act) continue;
@@ -682,17 +690,19 @@ function tween(ms, fn, token) {
   });
 }
 
+let walkStopTimer = 0;
 async function travel(ev, token) {
+  clearTimeout(walkStopTimer); // langkah berikutnya menyambung tanpa kembali ke pose diam
   const from = knight.position.clone();
   const to = new THREE.Vector3(worldX(ev.to.x), H, worldZ(ev.to.z));
   const jump = ev.type === 'jump';
-  const arc = jump ? (jumpAction ? 0.3 : 0.7) : 0; // klip Jump sudah mengangkat tubuh sendiri
+  const arc = jump ? (jumpAction ? 0.12 : 0.7) : 0; // klip Jump sudah membawa lonjakan tubuh sendiri
   const ms = dur(jump ? 560 : 420);
   // satu petak = satu langkah kaki = 1/walkSteps klip
   if (jump && jumpAction) {
     // klip lompat diputar penuh sekali selama lompatan
     moveAction = jumpAction;
-    jumpAction.time = 0;
+    jumpAction.reset().play(); // mulai dari awal; LoopOnce mencegah lompatan kedua
     walkRate = jumpAction.getClip().duration / (ms / 1000);
   } else if (walkAction) {
     moveAction = walkAction;
@@ -701,11 +711,15 @@ async function travel(ev, token) {
     walkRate = (walkAction.getClip().duration / steps) / (ms / 1000);
   }
   await tween(ms, (t) => {
-    const e = ease(t);
+    // jalan: kecepatan tetap agar langkah beruntun mengalir; lompat: percepat-perlambat
+    const e = jump ? ease(t) : t;
     knight.position.set(lerp(from.x, to.x, e), lerp(from.y, to.y, e) + Math.sin(Math.PI * t) * arc, lerp(from.z, to.z, e));
     if (!jump && !walkAction) knightBody.position.y = Math.abs(Math.sin(Math.PI * 2 * t)) * 0.05;
   }, token);
-  walkRate = 0;
+  // beri jeda singkat sebelum kembali ke idle: bila perintah berikutnya juga bergerak,
+  // animasi jalan tetap menyambung.
+  if (jump && jumpAction) walkRate = 0; // lompat selesai: langsung kembali ke idle
+  else walkStopTimer = setTimeout(() => { walkRate = 0; }, 180);
   knightBody.position.y = 0;
 }
 
